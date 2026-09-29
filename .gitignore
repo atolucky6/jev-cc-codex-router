@@ -1,0 +1,6 @@
+.env
+*.jsonl
+*.bak*
+errors-400/
+__pycache__/
+last-body.json

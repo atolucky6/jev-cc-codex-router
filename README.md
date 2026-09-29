@@ -4,7 +4,7 @@ A single-file Python proxy that routes each Codex turn to the cheapest model tie
 
 It sits between Codex and any OpenAI **Responses API**-compatible upstream (a local gateway such as cc-switch, or a remote endpoint). On every new user turn it asks [Jev](https://docs.typesafe.ai) (TypeSafe System One) which tier the task needs, rewrites the request's `model` field, and keeps that choice for the rest of the turn.
 
-> Status: early. It works on the author's setup, but the tier prompts are still being tuned and there is no cost backtest yet. Do not expect a specific saving.
+> Status: early. It works on the author's setup, but the tier prompts are still being tuned and there is no cost backtest yet. Do not expect a specific saving. One small self-measured cost estimate, with its conditions and limits, is in [BENCHMARK.md](BENCHMARK.md).
 
 ## How it decides
 

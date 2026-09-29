@@ -1,10 +1,12 @@
-# jev-router
+**English** | [简体中文](README.zh-CN.md)
+
+# jev-cc-codex-router
 
 A single-file Python proxy that routes each Codex turn to the cheapest model tier that can handle it.
 
 It sits between Codex and any OpenAI **Responses API**-compatible upstream (a local gateway such as cc-switch, or a remote endpoint). On every new user turn it asks [Jev](https://docs.typesafe.ai) (TypeSafe System One) which tier the task needs, rewrites the request's `model` field, and keeps that choice for the rest of the turn.
 
-> Status: early. It works on the author's setup, but the tier prompts are still being tuned and there is no cost backtest yet. Do not expect a specific saving. One small self-measured cost estimate, with its conditions and limits, is in [BENCHMARK.md](BENCHMARK.md).
+> Status: early. It works on the author's setup, but the tier prompts are still being tuned. One small self-measured cost estimate, with its conditions and limits, is in [BENCHMARK.md](BENCHMARK.md). Do not expect a specific saving.
 
 ## How it decides
 
@@ -20,15 +22,13 @@ It sits between Codex and any OpenAI **Responses API**-compatible upstream (a lo
 
 - For `POST /responses`, retries up to 2 times on upstream 400/502/503/504 or a connection error, waiting 1 second. This masks flaky upstreams. It cannot recover a stream that is cut after a 200 response.
 - Handles `Content-Encoding: zstd` request bodies (decompress, rewrite, recompress). Python 3.14+ uses the standard library; older Python needs `pip install zstandard`.
-- Set `JEV_DEBUG=1` to also dump request headers (`req-headers.jsonl`) and full failing 400 requests (`errors-400/`) for debugging. These contain your prompts; they are off by default and git-ignored.
-- Every routing decision is appended to `decisions.jsonl` (tier, probabilities, in/out model). This file contains prompt excerpts, so keep it private.
+- **Debug output is off by default.** Set `JEV_DEBUG=1` to write `decisions.jsonl` (tier, probabilities, in/out model per request), `req-headers.jsonl` (request headers) and `errors-400/` (full failing 400 requests). These files contain prompt excerpts, so keep them private. They are git-ignored. With debug off, the proxy writes no files.
 
 ## Setup
 
 1. Python 3.9+ (3.14 for built-in zstd).
 2. `cp .env.example .env` and set `TYPESAFE_API_KEY` (your own TypeSafe key).
-3. Set the upstream in `.env` if it is not `http://127.0.0.1:15721`:
-   `JEV_UPSTREAM=http://your-gateway:port`
+3. Set the upstream in `.env` if it is not `http://127.0.0.1:15721`: `JEV_UPSTREAM=http://your-gateway:port`
 4. Run: `python3 jev_router.py`
 5. Point Codex at the proxy in `~/.codex/config.toml`:
 
@@ -52,7 +52,7 @@ All settings are environment variables (or lines in `.env`). See `.env.example` 
 ## Notes and limits
 
 - Costs one small Jev call per new turn (plus at most one per failing step). Latency is roughly the Jev response time, a few seconds at worst, with a 15 second timeout.
-- The tier definitions are in `ask_jev()`. Edit them to match your own work; they currently reflect a coding-agent workload.
+- The tier definitions are in `ask_jev()`. Edit them to match your own work; they currently reflect a coding-agent workload. Some prompt text and the continuation-word list are in Chinese on purpose (the author works in Chinese); they still work for English input.
 - Model names default to `gpt-5.6-luna/terra/sol` and `gpt-6-astra`. Change them to whatever your upstream serves.
 - Not affiliated with TypeSafe or OpenAI.
 

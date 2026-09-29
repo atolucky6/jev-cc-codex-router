@@ -26,9 +26,9 @@ LISTEN_HOST = _env("JEV_LISTEN_HOST", "127.0.0.1")
 LISTEN_PORT = int(_env("JEV_LISTEN_PORT", "8787"))
 UPSTREAM_ORIGIN = _env("JEV_UPSTREAM", "http://127.0.0.1:15721").rstrip("/")
 JEV_URL = _env("JEV_API_URL", "https://api.typesafe.ai/v1/systemone")
+DEBUG_DUMPS = _env("JEV_DEBUG", "0") in ("1", "true", "True")  # debug on: write decisions/headers/400 dumps; off: write nothing 开启调试才写日志
 LOG = _env("JEV_LOG", os.path.join(os.path.dirname(os.path.abspath(__file__)), "decisions.jsonl"))
 
-DEBUG_DUMPS = _env("JEV_DEBUG", "0") in ("1", "true", "True")
 REWRITE = _env("JEV_REWRITE", "1") not in ("0", "false", "False", "")
 DEFAULT_MODEL = _env("JEV_FALLBACK_MODEL", "gpt-5.6-sol")
 MAP = {
@@ -41,6 +41,7 @@ MAP = {
 LEASE: dict[str, str] = {}
 BASE: dict[str, str] = {}
 LAST_PROBS: dict = {}
+# Bare continuation words (Chinese and English) that reuse the previous tier / 纯接续词（中英文），直接沿用上一档
 CONTINUE_WORDS = {"继续", "继续吧", "接着", "接着来", "go on", "continue", "keep going", "proceed", "go", "ok", "好", "好的", "可以", "行", "是的", "yes", "你再试试", "再试试", "再试一次", "重试", "再来", "再来一次", "retry", "try again", "again"}
 SKIP_PREFIXES = (
     "Generate a concise, single-line task title",
@@ -90,6 +91,9 @@ KEY = load_key()
 
 
 def log(obj: dict) -> None:
+    """Write the routing decision log only in debug mode. 仅调试模式下写决策日志。"""
+    if not DEBUG_DUMPS:
+        return
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     with open(LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -333,7 +337,7 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
     else:
         chosen = LEASE.get(sid, incoming)
         if BASE.get(sid) != incoming:
-            chosen = incoming  # Codex 自己换了模型(辅助请求), 不覆盖
+            chosen = incoming  # Codex switched model itself (helper request): do not override / Codex 自己换了模型(辅助请求), 不覆盖
         elif sid in LEASE:
             _err = last_tool_error(body)
             if _err is None:
@@ -384,7 +388,7 @@ RETRY_DELAY = float(_env("JEV_RETRY_DELAY", "1.0"))
 
 
 def open_with_retry(req, method: str, path: str):
-    """上游偶发 400/502 等错误时静默重试(仅 POST /responses), 最后一次失败则原样抛出。"""
+    """Retry flaky upstream 400/502/503/504 on POST /responses; re-raise the last failure. 上游偶发 400/502 等错误时静默重试(仅 POST /responses), 最后一次失败则原样抛出。"""
     retry_ok = method == "POST" and "/responses" in path.split("?", 1)[0]
     attempt = 0
     while True:
@@ -555,7 +559,7 @@ class Handler(BaseHTTPRequestHandler):
             if k.lower() in HOP_BY_HOP:
                 continue
             self.send_header(k, v)
-        # 上游响应没有 Content-Length 且已去掉 Transfer-Encoding: 用 Connection: close 标记结束
+        # Upstream response has no Content-Length and Transfer-Encoding is stripped: end it with Connection: close / 上游响应没有 Content-Length 且已去掉 Transfer-Encoding: 用 Connection: close 标记结束
         self.send_header("Connection", "close")
         self.close_connection = True
         self.end_headers()

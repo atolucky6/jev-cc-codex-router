@@ -1,3 +1,5 @@
+**English** | [简体中文](BENCHMARK.zh-CN.md)
+
 # Cost estimate from one real session (early, not a benchmark)
 
 This is a single, small, self-measured sample. Treat it as a rough indication, not as a general result.
@@ -6,7 +8,7 @@ This is a single, small, self-measured sample. Treat it as a rough indication, n
 
 - **Window:** 2026-09-29 17:43 to 22:31 (Asia/Shanghai), about 4 h 48 min, starting when the routing version with history-aware tier selection went live.
 - **Sample:** 304 successful Codex requests from one user, of which 22 were new user turns graded by Jev. Requests that failed and were retried are not counted.
-- **Data sources:** `decisions.jsonl` (routing decisions written by this proxy) and the request log of the local gateway (cc-switch), which records model, token counts (fresh input, cache read, output) and cost per request.
+- **Data sources:** `decisions.jsonl` (routing decisions written by this proxy when `JEV_DEBUG=1`) and the request log of the local gateway (cc-switch), which records model, token counts (fresh input, cache read, output) and cost per request.
 - **Prices used (USD per million tokens):**
 
 | Model | Fresh input | Cache read | Output |
@@ -43,6 +45,6 @@ This is a single, small, self-measured sample. Treat it as a rough indication, n
 
 ## Reproduce
 
-1. Read `decisions.jsonl` for routed turns (`new`, `tier`, `out`).
+1. Run the proxy with `JEV_DEBUG=1` so `decisions.jsonl` is written, then read it for routed turns (`new`, `tier`, `out`).
 2. From the gateway's request log, take successful requests in the same window and sum fresh input (input minus cache read), cache read and output tokens per model.
 3. Price them with the table above, then price the same tokens at sol rates and compare.

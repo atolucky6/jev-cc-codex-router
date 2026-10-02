@@ -558,21 +558,24 @@
                 <div class="form-grid-3" style="margin-top:16px;">
                     <div>
                         <label class="form-label">Optimizer Endpoint URL</label>
-                        <input id="set-opt-url" type="text" class="form-input" placeholder="https://openrouter.ai/api/v1/chat/completions">
-                        <div class="form-desc">API tương thích OpenAI (OpenRouter, DeepSeek, v.v.)</div>
+                        <input id="set-opt-url" type="text" class="form-input" placeholder="http://127.0.0.1:8317/v1/chat/completions">
+                        <div class="form-desc">API tương thích OpenAI (mặc định CLI Proxy API: http://127.0.0.1:8317/v1/chat/completions)</div>
                     </div>
                     <div>
                         <label class="form-label">Optimizer Model Name</label>
-                        <input id="set-opt-model" type="text" class="form-input" placeholder="google/gemini-2.5-flash">
-                        <div class="form-desc">Mô hình nhẹ & tốc độ cao (ví dụ: gemini-2.5-flash)</div>
+                        <input id="set-opt-model" type="text" class="form-input" list="upstream-models-list" placeholder="gemini-3.8-flash-high">
+                        <select class="model-quick-select" id="quick-select-opt" onchange="applyModelChoice('opt', this.value)" style="margin-top:6px;">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="form-desc">Mô hình tối ưu hóa prompt (mặc định: gemini-3.8-flash-high)</div>
                     </div>
                     <div>
                         <label class="form-label">Optimizer API Key</label>
                         <div style="display:flex; gap:8px;">
-                            <input id="set-opt-key" type="password" class="form-input" placeholder="Dùng chung key Jev nếu để trống">
+                            <input id="set-opt-key" type="password" class="form-input" placeholder="Dùng chung key Upstream nếu để trống">
                             <button type="button" class="btn" onclick="toggleOptKeyVisibility()" id="btn-toggle-opt-key">👁️</button>
                         </div>
-                        <div class="form-desc">Nếu để trống sẽ tự động dùng khóa OpenRouter của Jev</div>
+                        <div class="form-desc">Nếu để trống và trỏ tới CLI Proxy API sẽ tự dùng Upstream API Key</div>
                     </div>
                 </div>
 
@@ -1414,14 +1417,15 @@
                 optionsHtml += `</optgroup>`;
             }
 
-            const tiers = ['luna', 'terra', 'sol', 'astra', 'fallback'];
+            const tiers = ['luna', 'terra', 'sol', 'astra', 'fallback', 'opt'];
             for (const tier of tiers) {
                 const sel = document.getElementById('quick-select-' + tier);
                 if (sel) {
                     sel.innerHTML = optionsHtml;
-                    const curVal = document.getElementById('set-model-' + tier).value;
-                    if (curVal) {
-                        sel.value = curVal;
+                    const inputId = tier === 'opt' ? 'set-opt-model' : 'set-model-' + tier;
+                    const curInput = document.getElementById(inputId);
+                    if (curInput && curInput.value) {
+                        sel.value = curInput.value;
                     }
                 }
             }
@@ -1429,7 +1433,8 @@
 
         function applyModelChoice(tier, value) {
             if (!value) return;
-            const input = document.getElementById('set-model-' + tier);
+            const inputId = tier === 'opt' ? 'set-opt-model' : 'set-model-' + tier;
+            const input = document.getElementById(inputId);
             if (input) {
                 input.value = value;
                 input.style.borderColor = 'var(--accent)';
@@ -1472,9 +1477,9 @@
                 // Populate optimizer
                 const opt = data.optimizer || {};
                 document.getElementById('set-opt-enabled').checked = !!opt.enabled;
-                document.getElementById('set-opt-url').value = opt.url || 'https://openrouter.ai/api/v1/chat/completions';
-                document.getElementById('set-opt-model').value = opt.model || 'google/gemini-2.5-flash';
-                document.getElementById('set-opt-key').placeholder = opt.api_key_masked || 'Dùng chung key Jev nếu để trống';
+                document.getElementById('set-opt-url').value = opt.url || 'http://127.0.0.1:8317/v1/chat/completions';
+                document.getElementById('set-opt-model').value = opt.model || 'gemini-3.8-flash-high';
+                document.getElementById('set-opt-key').placeholder = opt.api_key_masked || 'Dùng chung key Upstream nếu để trống';
                 document.getElementById('set-opt-key').value = '';
                 document.getElementById('set-opt-timeout').value = opt.timeout_seconds || 8.0;
                 document.getElementById('set-opt-max-tokens').value = opt.max_tokens || 1200;
@@ -1589,8 +1594,8 @@
             document.getElementById('set-rule-escalate').checked = true;
             document.getElementById('set-rule-cooldown').value = 20;
             document.getElementById('set-opt-enabled').checked = true;
-            document.getElementById('set-opt-url').value = 'https://openrouter.ai/api/v1/chat/completions';
-            document.getElementById('set-opt-model').value = 'google/gemini-2.5-flash';
+            document.getElementById('set-opt-url').value = 'http://127.0.0.1:8317/v1/chat/completions';
+            document.getElementById('set-opt-model').value = 'gemini-3.8-flash-high';
             document.getElementById('set-opt-timeout').value = 8.0;
             document.getElementById('set-opt-max-tokens').value = 1200;
             document.getElementById('set-opt-temp').value = 0.3;

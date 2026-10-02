@@ -654,10 +654,10 @@ DEFAULT_OPTIMIZER_SYSTEM_PROMPT = (
 )
 
 OPT_ENABLED = True
-OPT_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPT_MODEL = "google/gemini-2.5-flash"
-OPT_KEY = ""
-OPT_TIMEOUT = 3.5
+OPT_URL = _env("JEV_OPTIMIZER_URL", "http://127.0.0.1:8317/v1/chat/completions")
+OPT_MODEL = _env("JEV_OPTIMIZER_MODEL", "gemini-3.8-flash-high")
+OPT_KEY = _env("JEV_OPTIMIZER_KEY", "")
+OPT_TIMEOUT = float(_env("JEV_OPTIMIZER_TIMEOUT", "15.0"))
 OPT_TEMPERATURE = 0.3
 OPT_MAX_TOKENS = 1200
 OPT_SYSTEM_PROMPT = DEFAULT_OPTIMIZER_SYSTEM_PROMPT
@@ -721,7 +721,12 @@ def run_prompt_optimizer(original_prompt: str) -> tuple[str, bool, str, float]:
     if not OPT_ENABLED:
         return original_prompt, False, "OPTIMIZER_DISABLED", 0.0
 
-    api_key = OPT_KEY or KEY
+    api_key = OPT_KEY
+    if not api_key:
+        if "8317" in OPT_URL or UPSTREAM_ORIGIN in OPT_URL or "127.0.0.1" in OPT_URL or "localhost" in OPT_URL:
+            api_key = UPSTREAM_KEY
+        else:
+            api_key = KEY
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "Jev-Codex-Router/1.0",
@@ -880,7 +885,11 @@ def sync_to_env() -> None:
         "JEV_UPSTREAM_KEY": UPSTREAM_KEY,
         "JEV_REWRITE": "1" if REWRITE else "0",
         "JEV_MODEL": JEV_MODEL,
+        "JEV_OPTIMIZER_URL": OPT_URL,
+        "JEV_OPTIMIZER_MODEL": OPT_MODEL,
     }
+    if OPT_KEY and "..." not in OPT_KEY:
+        updates["JEV_OPTIMIZER_KEY"] = OPT_KEY
     if KEY and not KEY.startswith("sk-or-v1-...") and "..." not in KEY:
         updates["OPENROUTER_API_KEY"] = KEY
 
@@ -924,7 +933,12 @@ def get_current_settings() -> dict:
         else:
             u_key_masked = "sk-***"
     
-    effective_opt_key = OPT_KEY or KEY
+    effective_opt_key = OPT_KEY
+    if not effective_opt_key:
+        if "8317" in OPT_URL or UPSTREAM_ORIGIN in OPT_URL or "127.0.0.1" in OPT_URL or "localhost" in OPT_URL:
+            effective_opt_key = UPSTREAM_KEY
+        else:
+            effective_opt_key = KEY
     opt_key_masked = ""
     if effective_opt_key:
         if len(effective_opt_key) > 12:
@@ -1075,8 +1089,10 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
         if opt_cfg.get("model"):
             OPT_MODEL = opt_cfg["model"].strip()
         new_opt_key = opt_cfg.get("api_key") or ""
-        if new_opt_key and not new_opt_key.startswith("sk-or-v1-...") and "..." not in new_opt_key:
+        if new_opt_key and not new_opt_key.startswith("sk-or-v1-...") and not new_opt_key.startswith("sk-4a7d...ca9c") and "..." not in new_opt_key:
             OPT_KEY = new_opt_key.strip()
+        elif new_opt_key == "":
+            OPT_KEY = ""
         if "timeout_seconds" in opt_cfg:
             try:
                 OPT_TIMEOUT = float(opt_cfg["timeout_seconds"])

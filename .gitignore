@@ -4,3 +4,4 @@
 errors-400/
 __pycache__/
 last-body.json
+decisions.db

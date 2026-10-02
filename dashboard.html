@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jev Codex Router & Prompt Optimizer</title>
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --border: #374151;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #38bdf8;
+            --accent-purple: #8b5cf6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --luna: #10b981;
+            --terra: #0284c7;
+            --sol: #8b5cf6;
+            --astra: #f43f5e;
+            --reuse: #6b7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg-primary); color: var(--text-main); min-height: 100vh; padding: 24px 16px; }
+        .container { max-width: 1260px; margin: 0 auto; }
+        
+        /* Header */
+        .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .header-left h1 { font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; color: var(--text-main); }
+        .header-left h1 span.icon { color: #f59e0b; }
+        .header-left p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+        .header-right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        
+        .badge-status { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+        .badge-opt-status { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); color: #c084fc; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 1.8s infinite; }
+        .pulse-dot-purple { width: 8px; height: 8px; border-radius: 50%; background: #8b5cf6; box-shadow: 0 0 10px #8b5cf6; animation: pulse 1.8s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        
+        /* Buttons */
+        .btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { background: #374151; border-color: #4b5563; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #0284c7; border-color: #38bdf8; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-purple { background: #7c3aed; border-color: #a78bfa; }
+        .btn-purple:hover { background: #6d28d9; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+        
+        /* Main Navigation */
+        .main-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        .nav-tab { background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .nav-tab:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.04); }
+        .nav-tab.active { color: #38bdf8; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); }
+        .nav-tab.active-purple { color: #c084fc; background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.35); }
+
+        /* Stats Grids */
+        .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .stat-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 18px; position: relative; overflow: hidden; }
+        .stat-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--card-color, var(--accent)); }
+        .stat-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 700; display: flex; justify-content: space-between; }
+        .stat-value { font-size: 28px; font-weight: 800; margin-top: 8px; color: var(--card-color, var(--text-main)); }
+        .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-family: monospace; }
+        
+        .opt-stats-bar { background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .opt-stat-item { display: flex; flex-direction: column; }
+        .opt-stat-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #a78bfa; letter-spacing: 0.04em; }
+        .opt-stat-val { font-size: 22px; font-weight: 800; color: #f8fafc; margin-top: 4px; }
+        .opt-stat-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        /* Panels */
+        .info-panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 24px; }
+        .info-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .info-panel h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 700; }
+        .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .mapping-item { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+        .mapping-tier { font-weight: 700; font-size: 13px; text-transform: uppercase; }
+        .mapping-model { font-family: monospace; font-size: 13px; color: #38bdf8; }
+        
+        /* Tables */
+        .table-section { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+        .table-header { padding: 16px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+        .table-header h2 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .search-box { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-main); padding: 8px 14px; border-radius: 8px; font-size: 13px; width: 320px; outline: none; }
+        .search-box:focus { border-color: var(--accent); }
+        
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { padding: 12px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.25); white-space: nowrap; }
+        td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        
+        /* Badges */
+        .tier-badge { padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; }
+        .tier-luna { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+        .tier-terra { background: rgba(2, 132, 199, 0.15); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
+        .tier-sol { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+        .tier-astra { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.4); }
+        .tier-reuse { background: rgba(107, 114, 128, 0.15); color: #9ca3af; border: 1px solid rgba(107, 114, 128, 0.4); }
+
+        .effort-badge { padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; font-family: monospace; }
+        .effort-low { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.4); }
+        .effort-medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+        .effort-high { background: rgba(217, 70, 239, 0.15); color: #e879f9; border: 1px solid rgba(217, 70, 239, 0.4); }
+        
+        .opt-badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+        .opt-badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+        .opt-badge-bypass { background: rgba(107, 114, 128, 0.15); color: #9ca3af; border: 1px solid rgba(107, 114, 128, 0.3); }
+        .opt-badge-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+        .prompt-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; color: #e2e8f0; }
+        .model-cell { font-family: monospace; font-weight: 600; color: #38bdf8; }
+        .orig-cell { font-family: monospace; color: #6b7280; font-size: 12px; }
+
+        .badge-planning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-escalate { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+        
+        /* Alerts */
+        #test-alert, #settings-alert, #playground-alert { display: none; margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.5; }
+        .alert-success { background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; }
+        .alert-error { background: rgba(244, 63, 94, 0.2); border: 1px solid #f43f5e; color: #fb7185; }
+
+        /* Settings View Styles */
+        .settings-section { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 24px; }
+        .settings-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .settings-section p.sec-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        
+        .form-grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .form-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .form-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        
+        .model-box { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; position: relative; }
+        .model-box.luna { border-top: 3px solid var(--luna); }
+        .model-box.terra { border-top: 3px solid var(--terra); }
+        .model-box.sol { border-top: 3px solid var(--sol); }
+        .model-box.astra { border-top: 3px solid var(--astra); }
+        .model-box label { font-size: 12px; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 8px; }
+        .model-box .desc { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
+        
+        .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
+        .form-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+        .form-input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-main); padding: 9px 12px; border-radius: 8px; font-size: 13px; font-family: monospace; outline: none; transition: border-color 0.2s; }
+        .form-input:focus { border-color: var(--accent); }
+        .form-textarea { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 8px; font-size: 12px; font-family: monospace; outline: none; min-height: 80px; resize: vertical; line-height: 1.5; transition: border-color 0.2s; }
+        .form-textarea:focus { border-color: var(--accent); }
+
+        .rule-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
+        .rule-card .rule-title { font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .rule-card .rule-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        .switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .switch-slider { width: 44px; height: 24px; background-color: #334155; transition: .25s; border-radius: 24px; position: relative; display: inline-block; }
+        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #f8fafc; transition: .25s; border-radius: 50%; }
+        input:checked + .switch-slider { background-color: #0284c7; }
+        input:checked + .switch-slider.purple { background-color: #7c3aed; }
+        input:checked + .switch-slider:before { transform: translateX(20px); }
+
+        .actions-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 12px; }
+        .sec-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+        .model-quick-select { width: 100%; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); padding: 7px 10px; border-radius: 6px; font-size: 12px; font-family: monospace; outline: none; cursor: pointer; }
+        .model-quick-select:focus { border-color: var(--accent); }
+        .model-quick-select optgroup { font-weight: 700; color: var(--accent); background: var(--bg-primary); }
+        .model-quick-select option { color: var(--text-main); background: var(--bg-card); }
+
+        /* Diff Viewer Styles */
+        .diff-block { background: #050811; border: 1px solid var(--border); border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.6; padding: 12px 14px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+        .diff-line-add { color: #4ade80; background: rgba(34, 197, 94, 0.12); display: block; padding: 1px 4px; border-radius: 2px; }
+        .diff-line-del { color: #f87171; background: rgba(239, 68, 68, 0.12); display: block; padding: 1px 4px; border-radius: 2px; }
+        .diff-line-info { color: #94a3b8; font-style: italic; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-box { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
+        .modal-header h3 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .modal-close { background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+        .modal-close:hover { color: #fff; background: var(--bg-card); }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .modal-tab-btn { background: transparent; border: none; color: var(--text-muted); padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .modal-tab-btn.active { color: var(--accent); background: rgba(56, 189, 248, 0.12); }
+        
+        .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .side-by-side { grid-template-columns: 1fr; } }
+        .panel-box { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+        .panel-box-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* Playground Styles */
+        .chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px 0; }
+        .chip { background: var(--bg-card); border: 1px solid var(--border); color: #cbd5e1; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .chip:hover { border-color: var(--accent); color: #fff; background: #334155; }
+        .latency-bar-container { background: #1e293b; height: 10px; border-radius: 5px; overflow: hidden; display: flex; margin: 12px 0; }
+        .latency-bar-opt { background: #8b5cf6; height: 100%; transition: width 0.4s; }
+        .latency-bar-jev { background: #0284c7; height: 100%; transition: width 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top App Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1><span class="icon">⚡</span> Jev Codex Router & AI Optimizer</h1>
+                <p>Cổng tối ưu hóa Prompt thông minh & Định tuyến mô hình đa tầng cho Codex</p>
+            </div>
+            <div class="header-right">
+                <span class="badge-status"><span class="pulse-dot"></span> ROUTER ACTIVE</span>
+                <span class="badge-opt-status" id="header-opt-badge"><span class="pulse-dot-purple"></span> OPTIMIZER ON</span>
+                <button class="btn btn-purple" onclick="switchTab('playground')">🧪 Thử nghiệm Sandbox</button>
+                <button class="btn" onclick="refreshCurrentTab()">🔄 Làm mới</button>
+            </div>
+        </div>
+
+        <!-- Main Navigation Tabs -->
+        <div class="main-nav">
+            <button class="nav-tab active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">
+                <span>📊</span> Tổng quan & Giám sát (Dashboard)
+            </button>
+            <button class="nav-tab" id="tab-btn-diffs" onclick="switchTab('diffs')">
+                <span>📝</span> Nhật ký Tối ưu Prompt (Diffs Audit)
+            </button>
+            <button class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings')">
+                <span>⚙️</span> Cài đặt Models, Rules & Optimizer
+            </button>
+            <button class="nav-tab" id="tab-btn-playground" onclick="switchTab('playground')">
+                <span>🧪</span> Sandbox Thử nghiệm Toàn trình
+            </button>
+        </div>
+
+        <!-- ================= VIEW 1: DASHBOARD ================= -->
+        <div id="view-dashboard">
+            <div id="test-alert"></div>
+
+            <!-- Primary Routing Stats -->
+            <div class="grid-stats">
+                <div class="stat-card" style="--card-color: #38bdf8;">
+                    <div class="stat-title"><span>Tổng lượt phân loại</span> <span>🔄</span></div>
+                    <div class="stat-value" id="val-total">0</div>
+                    <div class="stat-sub" id="val-uptime">Uptime: 0s</div>
+                </div>
+                <div class="stat-card" style="--card-color: var(--luna);">
+                    <div class="stat-title"><span>Luna Tier</span> <span id="pct-luna">0%</span></div>
+                    <div class="stat-value" id="val-luna">0</div>
+                    <div class="stat-sub" id="sub-luna">gpt-6-luna</div>
+                </div>
+                <div class="stat-card" style="--card-color: var(--terra);">
+                    <div class="stat-title"><span>Terra Tier</span> <span id="pct-terra">0%</span></div>
+                    <div class="stat-value" id="val-terra">0</div>
+                    <div class="stat-sub" id="sub-terra">gpt-6-sol</div>
+                </div>
+                <div class="stat-card" style="--card-color: var(--sol);">
+                    <div class="stat-title"><span>Sol Tier</span> <span id="pct-sol">0%</span></div>
+                    <div class="stat-value" id="val-sol">0</div>
+                    <div class="stat-sub" id="sub-sol">gpt-6.1-sol</div>
+                </div>
+                <div class="stat-card" style="--card-color: var(--astra);">
+                    <div class="stat-title"><span>Astra Tier</span> <span id="pct-astra">0%</span></div>
+                    <div class="stat-value" id="val-astra">0</div>
+                    <div class="stat-sub" id="sub-astra">gpt-6-astra</div>
+                </div>
+            </div>
+
+            <!-- Optimizer Secondary KPI Banner -->
+            <div class="opt-stats-bar">
+                <div class="opt-stat-item">
+                    <div class="opt-stat-label">⚡ Prompt đã tối ưu</div>
+                    <div class="opt-stat-val" id="val-opt-count">0 <span style="font-size:14px; color:#34d399; font-weight:normal;" id="pct-opt-rate">(0%)</span></div>
+                    <div class="opt-stat-desc">Số lượt prompt con người được nâng cấp</div>
+                </div>
+                <div class="opt-stat-item">
+                    <div class="opt-stat-label">⏱️ Độ trễ trung bình Optimizer</div>
+                    <div class="opt-stat-val" id="val-opt-latency">0 ms</div>
+                    <div class="opt-stat-desc">Thời gian pipeline tối ưu prompt tiền xử lý</div>
+                </div>
+                <div class="opt-stat-item">
+                    <div class="opt-stat-label">📈 Tỷ lệ mở rộng Tokens</div>
+                    <div class="opt-stat-val" id="val-opt-ratio">1.0x</div>
+                    <div class="opt-stat-desc">Hệ số bổ sung cấu trúc & làm rõ mục tiêu</div>
+                </div>
+                <div class="opt-stat-item">
+                    <div class="opt-stat-label">🛡️ Tính toàn vẹn Biến số</div>
+                    <div class="opt-stat-val" style="color:#34d399;">100% Strict</div>
+                    <div class="opt-stat-desc">Bảo toàn tuyệt đối {{var}}, ${var}, mã code</div>
+                </div>
+            </div>
+
+            <!-- Model Mapping and System Summary -->
+            <div class="info-panel">
+                <div class="info-panel-header">
+                    <h3>⚙️ Ánh xạ mô hình hiện tại (Model Mapping)</h3>
+                    <button class="btn btn-sm" onclick="switchTab('settings')">Chỉnh sửa trong Cài đặt ⚙️</button>
+                </div>
+                <div class="mapping-grid">
+                    <div class="mapping-item">
+                        <span class="mapping-tier" style="color:var(--luna);">🟢 LUNA</span>
+                        <span class="mapping-model" id="map-luna">-</span>
+                    </div>
+                    <div class="mapping-item">
+                        <span class="mapping-tier" style="color:var(--terra);">🔵 TERRA</span>
+                        <span class="mapping-model" id="map-terra">-</span>
+                    </div>
+                    <div class="mapping-item">
+                        <span class="mapping-tier" style="color:var(--sol);">🟣 SOL</span>
+                        <span class="mapping-model" id="map-sol">-</span>
+                    </div>
+                    <div class="mapping-item">
+                        <span class="mapping-tier" style="color:var(--astra);">🔴 ASTRA</span>
+                        <span class="mapping-model" id="map-astra">-</span>
+                    </div>
+                </div>
+                <div style="margin-top:14px; font-size:12px; color:var(--text-muted); display:flex; flex-wrap:wrap; gap:16px;">
+                    <div><strong>Upstream Gateway:</strong> <span id="info-upstream" style="color:#38bdf8;">-</span></div>
+                    <div><strong>Jev Backend:</strong> <span id="info-jev" style="color:#38bdf8;">-</span></div>
+                    <div><strong>Phân loại kép:</strong> <span style="color:#34d399;">Model Tier + Reasoning Effort</span></div>
+                    <div><strong>Database:</strong> <span style="color:#38bdf8;">SQLite (decisions.db)</span></div>
+                </div>
+            </div>
+
+            <!-- Decisions Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h2>📋 Lịch sử định tuyến (Routing Decisions Log)</h2>
+                    <input type="text" class="search-box" id="search-input" placeholder="Tìm prompt, tier, reasoning, model, optimizer..." oninput="renderTable()">
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Prompt (Người dùng)</th>
+                                <th>Tối ưu Prompt</th>
+                                <th>Tier</th>
+                                <th>Mức suy luận</th>
+                                <th>Độ tin cậy</th>
+                                <th>Model được chọn</th>
+                                <th>Model gốc</th>
+                                <th>Phân loại</th>
+                            </tr>
+                        </thead>
+                        <tbody id="decisions-body">
+                            <tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">Đang tải dữ liệu...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 2: PROMPT DIFFS AUDIT ================= -->
+        <div id="view-diffs" style="display:none;">
+            <div class="table-section">
+                <div class="table-header">
+                    <div>
+                        <h2>📝 Nhật ký Tối ưu Prompt (Prompt Transformation Audit)</h2>
+                        <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Theo dõi chi tiết các biến đổi trước/sau khi prompt được tinh chỉnh và gửi sang Jev/Codex.</p>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="text" class="search-box" id="search-diffs-input" placeholder="Tìm prompt gốc, sau tối ưu, status..." oninput="renderDiffsTable()">
+                        <button class="btn btn-sm" onclick="fetchDiffsData()">🔄 Tải lại</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Prompt Gốc (Original)</th>
+                                <th>Prompt Sau Tối ưu (Optimized)</th>
+                                <th>Trạng thái</th>
+                                <th>Độ trễ</th>
+                                <th>Tokens (Gốc ➔ Mới)</th>
+                                <th>Model Định tuyến</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="diffs-body">
+                            <tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Đang tải danh sách prompt...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 3: SETTINGS ================= -->
+        <div id="view-settings" style="display:none;">
+            <div id="settings-alert"></div>
+
+            <!-- SECTION 1: MODELS SETTINGS -->
+            <div class="settings-section">
+                <div class="sec-header">
+                    <div>
+                        <h2>🤖 Cấu hình Model Mappings (Models Settings)</h2>
+                        <p class="sec-desc" style="margin-bottom:0;">Tùy biến tên mô hình được ánh xạ cho 4 phân cấp (Tiers) khi Codex gửi request qua Jev Router.</p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="models-count-badge" style="display:none; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; font-weight:700; font-size:12px; padding:6px 12px; border-radius:9999px;"></span>
+                        <button type="button" class="btn" onclick="fetchUpstreamModels(true)" id="btn-fetch-models">🔄 Lấy danh sách từ CLIProxyAPI</button>
+                    </div>
+                </div>
+
+                <datalist id="upstream-models-list"></datalist>
+
+                <div class="form-grid-4" style="margin-top:16px;">
+                    <div class="model-box luna">
+                        <label style="color:var(--luna);">🟢 LUNA Model (Nhẹ / Nhanh)</label>
+                        <input id="set-model-luna" type="text" class="form-input" list="upstream-models-list" placeholder="gpt-6-luna">
+                        <select class="model-quick-select" id="quick-select-luna" onchange="applyModelChoice('luna', this.value)">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="desc">Dành cho git status, format, sửa typo, tác vụ đơn giản</div>
+                    </div>
+                    <div class="model-box terra">
+                        <label style="color:var(--terra);">🔵 TERRA Model (Tiêu chuẩn)</label>
+                        <input id="set-model-terra" type="text" class="form-input" list="upstream-models-list" placeholder="gpt-6-sol">
+                        <select class="model-quick-select" id="quick-select-terra" onchange="applyModelChoice('terra', this.value)">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="desc">Dành cho 1-2 file, code theo plan có sẵn, unit test</div>
+                    </div>
+                    <div class="model-box sol">
+                        <label style="color:var(--sol);">🟣 SOL Model (Mạnh mẽ)</label>
+                        <input id="set-model-sol" type="text" class="form-input" list="upstream-models-list" placeholder="gpt-6.1-sol">
+                        <select class="model-quick-select" id="quick-select-sol" onchange="applyModelChoice('sol', this.value)">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="desc">Dành cho đa module, bug phức tạp, feature planning</div>
+                    </div>
+                    <div class="model-box astra">
+                        <label style="color:var(--astra);">🔴 ASTRA Model (Frontier)</label>
+                        <input id="set-model-astra" type="text" class="form-input" list="upstream-models-list" placeholder="gpt-6-astra">
+                        <select class="model-quick-select" id="quick-select-astra" onchange="applyModelChoice('astra', this.value)">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="desc">Dành cho kiến trúc hệ thống, data migration, security</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label">Model dự phòng mặc định (Fallback Model)</label>
+                        <input id="set-model-fallback" type="text" class="form-input" list="upstream-models-list" placeholder="gpt-6.1-sol">
+                        <select class="model-quick-select" id="quick-select-fallback" onchange="applyModelChoice('fallback', this.value)">
+                            <option value="">-- Chọn nhanh model từ danh sách --</option>
+                        </select>
+                        <div class="form-desc">Sử dụng khi Jev API không phản hồi hoặc không nhận diện được</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Upstream Gateway URL (CLIProxyAPI)</label>
+                        <input id="set-upstream-url" type="text" class="form-input" placeholder="http://127.0.0.1:8317">
+                        <div class="form-desc">Địa chỉ của proxy gateway phía sau (cli-proxy-api)</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label">CLIProxyAPI Bearer Token (nếu có)</label>
+                        <div style="display:flex; gap:8px;">
+                            <input id="set-upstream-key" type="password" class="form-input" placeholder="Để trống nếu không đổi">
+                            <button type="button" class="btn" onclick="toggleUpstreamKeyVisibility()" id="btn-toggle-upstream-key">👁️</button>
+                        </div>
+                        <div class="form-desc">Khóa Bearer Token xác thực kết nối CLIProxyAPI (đồng bộ /v1/models)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Jev Backend Model (OpenRouter)</label>
+                        <input id="set-jev-model" type="text" class="form-input" placeholder="typesafe/jev-1.13">
+                        <div class="form-desc">Model chịu trách nhiệm phân loại tier & reasoning effort</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label">OpenRouter API Key (Jev Classifier)</label>
+                        <div style="display:flex; gap:8px;">
+                            <input id="set-jev-key" type="password" class="form-input" placeholder="Để trống nếu không đổi">
+                            <button type="button" class="btn" onclick="toggleKeyVisibility()" id="btn-toggle-key">👁️</button>
+                        </div>
+                        <div class="form-desc">Khóa API OpenRouter để gọi Jev Model. Để trống để giữ nguyên.</div>
+                    </div>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: ROUTING RULES -->
+            <div class="settings-section">
+                <h2>🔀 Cấu hình Quy tắc định tuyến (Routing Rules)</h2>
+                <p class="sec-desc">Bật/tắt các hành vi tự động và quản lý bộ từ khóa nhận diện lập kế hoạch (Planning) & kiến trúc (Architecture).</p>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">⚡ Bật Model Rewriting (Định tuyến thông minh)</div>
+                        <div class="rule-desc">Tự động viết lại trường <code>model</code> và <code>reasoning.effort</code> trong request gửi tới Codex gateway. Tắt tính năng này để chuyển tiếp nguyên bản (Bypass).</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-rule-rewrite">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">🎯 Bật Planning Priority Boost (Ưu tiên Lập kế hoạch)</div>
+                        <div class="rule-desc">Tự động ưu tiên chọn tối thiểu <strong>SOL</strong> (hoặc <strong>ASTRA</strong> nếu là kiến trúc) kèm mức suy luận <strong>HIGH</strong> mỗi khi phát hiện task Planning / Superpowers.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-rule-planning">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">🚀 Bật Auto-Escalation khi Tool lỗi</div>
+                        <div class="rule-desc">Tự động nâng tier model cao hơn khi các lệnh hoặc tool call gặp lỗi liên tiếp (error streak).</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-rule-escalate">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+
+                <div style="margin: 16px 0 20px 0; max-width: 360px;">
+                    <label class="form-label">Thời gian Cooldown Escalation (giây)</label>
+                    <input id="set-rule-cooldown" type="number" min="5" max="300" step="1" class="form-input" placeholder="20">
+                    <div class="form-desc">Khoảng cách thời gian tối thiểu giữa 2 lần kích hoạt leo thang do lỗi tool.</div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label class="form-label">📋 Danh sách từ khóa nhận diện Planning (Lập kế hoạch, Spec, Superpowers)</label>
+                    <textarea id="set-keywords-planning" class="form-textarea" rows="4" placeholder="Mỗi từ khóa 1 dòng hoặc cách nhau dấu phẩy..."></textarea>
+                    <div class="form-desc">Khi prompt chứa bất kỳ từ khóa nào trong danh sách này, router sẽ tự động ưu tiên gán Sol/Astra và Reasoning High.</div>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label class="form-label">🏛️ Danh sách từ khóa nhận diện Heavy Architecture (Kiến trúc lớn / An ninh)</label>
+                    <textarea id="set-keywords-arch" class="form-textarea" rows="3" placeholder="Mỗi từ khóa 1 dòng hoặc cách nhau dấu phẩy..."></textarea>
+                    <div class="form-desc">Các từ khóa kiến trúc đặc thù (microservices, concurrency, migration...) sẽ kích hoạt nâng thẳng lên <strong>ASTRA</strong>.</div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: PROMPT OPTIMIZER SETTINGS -->
+            <div class="settings-section">
+                <h2>⚡ Cấu hình Tối ưu hóa Prompt (Prompt Optimizer Settings)</h2>
+                <p class="sec-desc">Tự động tiền xử lý, cấu trúc hóa và làm rõ prompt của người dùng TRƯỚC KHI gửi tới Jev để phân loại và Codex để sinh code.</p>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">⚡ Bật Prompt Optimizer trước khi gửi Jev & Codex</div>
+                        <div class="rule-desc">Tự động lọc các câu hỏi con người, làm rõ yêu cầu, bổ sung cấu trúc đầu ra mà vẫn giữ nguyên 100% mục tiêu kỹ thuật.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-opt-enabled">
+                        <span class="switch-slider purple"></span>
+                    </label>
+                </div>
+
+                <div class="form-grid-3" style="margin-top:16px;">
+                    <div>
+                        <label class="form-label">Optimizer Endpoint URL</label>
+                        <input id="set-opt-url" type="text" class="form-input" placeholder="https://openrouter.ai/api/v1/chat/completions">
+                        <div class="form-desc">API tương thích OpenAI (OpenRouter, DeepSeek, v.v.)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Optimizer Model Name</label>
+                        <input id="set-opt-model" type="text" class="form-input" placeholder="google/gemini-2.5-flash">
+                        <div class="form-desc">Mô hình nhẹ & tốc độ cao (ví dụ: gemini-2.5-flash)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Optimizer API Key</label>
+                        <div style="display:flex; gap:8px;">
+                            <input id="set-opt-key" type="password" class="form-input" placeholder="Dùng chung key Jev nếu để trống">
+                            <button type="button" class="btn" onclick="toggleOptKeyVisibility()" id="btn-toggle-opt-key">👁️</button>
+                        </div>
+                        <div class="form-desc">Nếu để trống sẽ tự động dùng khóa OpenRouter của Jev</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-3">
+                    <div>
+                        <label class="form-label">Timeout Tối ưu hóa (giây)</label>
+                        <input id="set-opt-timeout" type="number" step="0.5" min="1" max="30" class="form-input" placeholder="8.0">
+                        <div class="form-desc">Hết thời gian này sẽ tự động bỏ qua (zero-latency fallback)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Max Tokens Sinh ra</label>
+                        <input id="set-opt-max-tokens" type="number" min="100" max="4000" class="form-input" placeholder="1200">
+                        <div class="form-desc">Giới hạn token (cần thiết với OpenRouter flash models)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Nhiệt độ (Temperature)</label>
+                        <input id="set-opt-temp" type="number" step="0.05" min="0" max="1" class="form-input" placeholder="0.3">
+                        <div class="form-desc">Độ sáng tạo thấp giúp prompt chính xác và bám sát thực tế</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label">Độ dài ký tự tối thiểu (Min Characters)</label>
+                        <input id="set-opt-min-chars" type="number" min="1" max="100" class="form-input" placeholder="12">
+                        <div class="form-desc">Bỏ qua các câu quá ngắn dưới ngưỡng này</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Số lượng từ tối thiểu (Min Words)</label>
+                        <input id="set-opt-min-words" type="number" min="1" max="30" class="form-input" placeholder="3">
+                        <div class="form-desc">Bỏ qua câu có ít hơn số từ quy định</div>
+                    </div>
+                </div>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">🔒 Bảo toàn nghiêm ngặt Biến số (Strict Variable Preservation)</div>
+                        <div class="rule-desc">Hủy bỏ tối ưu và giữ nguyên bản nếu phát hiện biến số <code>{{var}}</code> hoặc <code>${var}</code> bị thay đổi hoặc thiếu.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-opt-preserve-vars">
+                        <span class="switch-slider purple"></span>
+                    </label>
+                </div>
+
+                <div class="rule-card">
+                    <div class="rule-text">
+                        <div class="rule-title">⏭️ Tự động bỏ qua các câu xác nhận ngắn (Skip Short Confirmations)</div>
+                        <div class="rule-desc">Không kích hoạt optimizer khi người dùng chỉ gõ <code>yes</code>, <code>ok</code>, <code>tiếp tục</code>, <code>chạy đi</code>, v.v.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="set-opt-skip-short">
+                        <span class="switch-slider purple"></span>
+                    </label>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label class="form-label">🚫 Dấu hiệu loại trừ vòng lặp tự động (Autonomous Loop Markers)</label>
+                    <textarea id="set-opt-loop-markers" class="form-textarea" rows="3" placeholder="Mỗi dấu hiệu 1 dòng..."></textarea>
+                    <div class="form-desc">Nếu prompt chứa các từ này, hệ thống sẽ bỏ qua để không can thiệp vào vòng lặp agent ngầm.</div>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label class="form-label">📜 System Prompt Hướng dẫn Tối ưu hóa (Optimizer System Prompt)</label>
+                    <textarea id="set-opt-sys-prompt" class="form-textarea" rows="5" placeholder="Quy tắc hướng dẫn LLM tối ưu..."></textarea>
+                    <div class="form-desc">Hướng dẫn chỉ đạo mô hình optimizer cách tinh chỉnh văn bản mà không làm sai lệch ý định của lập trình viên.</div>
+                </div>
+
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="saveSettings()" id="btn-save-settings">💾 Lưu Cấu hình & Áp dụng ngay</button>
+                    <button class="btn" onclick="loadSettings()">🔄 Đọc lại</button>
+                    <button class="btn" onclick="resetDefaultSettings()" style="color:#f87171; border-color:rgba(239,68,68,0.4);">⚠️ Khôi phục mặc định</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 4: PLAYGROUND ================= -->
+        <div id="view-playground" style="display:none;">
+            <div id="playground-alert"></div>
+
+            <div class="settings-section">
+                <h2>🧪 Sandbox Thử nghiệm Toàn trình (End-to-End Pipeline)</h2>
+                <p class="sec-desc">Mô phỏng chính xác quy trình: Nhập prompt ➔ Bộ lọc Heuristics ➔ AI Optimizer ➔ Phân tích Planning ➔ Jev Classifier ➔ Ánh xạ Model.</p>
+
+                <div style="margin-bottom: 12px;">
+                    <label class="form-label">Nhập Prompt Người dùng cần thử nghiệm:</label>
+                    <textarea id="play-input" class="form-textarea" style="min-height:100px; font-size:13px;" placeholder="Ví dụ: Fix auth token refresh bug for {{user_id}} in login controller..."></textarea>
+                </div>
+
+                <div style="font-size:12px; color:var(--text-muted);">
+                    <strong>💡 Mẫu thử nghiệm nhanh:</strong>
+                    <div class="chip-list">
+                        <span class="chip" onclick="fillPlayground('Fix auth bug for {{user_id}} in login controller with proper exception handling')">🐛 Bug sửa lỗi Auth với {{user_id}}</span>
+                        <span class="chip" onclick="fillPlayground('Lập kế hoạch thiết kế kiến trúc microservices và triển khai TDD suites cho hệ thống thanh toán')">🎯 Lập kế hoạch hệ thống (Planning Boost)</span>
+                        <span class="chip" onclick="fillPlayground('ok tiếp tục đi')">⏭️ Xác nhận ngắn (Heuristic Bypass)</span>
+                        <span class="chip" onclick="fillPlayground('git status')">🟢 Tác vụ cơ bản (Luna Tier)</span>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin: 16px 0 20px 0;">
+                    <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                        <input type="checkbox" id="play-force-opt">
+                        <span>Ép buộc tối ưu (Bỏ qua heuristic check)</span>
+                    </label>
+                </div>
+
+                <div class="actions-bar" style="border-top:1px solid var(--border); padding-top:16px;">
+                    <button class="btn btn-primary" onclick="runPipelineTest()" id="btn-run-pipeline">🚀 Chạy Toàn trình (Optimize + Jev Route)</button>
+                    <button class="btn btn-purple" onclick="runOptimizerTest()" id="btn-run-opt">⚡ Chỉ Test Optimizer</button>
+                    <button class="btn" onclick="runJevOnlyTest()" id="btn-run-jev">🎯 Chỉ Test Jev Phân loại</button>
+                </div>
+            </div>
+
+            <!-- Playground Results Display -->
+            <div id="play-results" style="display:none;" class="settings-section">
+                <div class="sec-header">
+                    <h2>📊 Kết quả Thử nghiệm Toàn trình</h2>
+                    <span id="play-total-time" style="font-weight:700; color:#38bdf8; font-size:14px;"></span>
+                </div>
+
+                <!-- Latency Breakdown Bar -->
+                <div style="margin: 10px 0;">
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:4px;">
+                        <span>Độ trễ thành phần:</span>
+                        <span id="play-latency-legend"></span>
+                    </div>
+                    <div class="latency-bar-container">
+                        <div class="latency-bar-opt" id="play-bar-opt" style="width:0%;"></div>
+                        <div class="latency-bar-jev" id="play-bar-jev" style="width:0%;"></div>
+                    </div>
+                </div>
+
+                <!-- 2-Stage Cards -->
+                <div class="side-by-side" style="margin-top:20px;">
+                    <!-- Stage 1: Optimizer Result -->
+                    <div class="panel-box">
+                        <div class="panel-box-title">
+                            <span>⚡ Bước 1: Prompt Optimizer</span>
+                            <span id="play-opt-badge"></span>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;" id="play-opt-meta">-</div>
+                        
+                        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Nội dung sau tối ưu:</div>
+                        <div class="diff-block" id="play-opt-text" style="max-height:160px;">-</div>
+
+                        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin:12px 0 4px 0;">Diff Khác biệt:</div>
+                        <div class="diff-block" id="play-diff-view" style="max-height:160px;">-</div>
+                    </div>
+
+                    <!-- Stage 2: Jev Classifier Result -->
+                    <div class="panel-box">
+                        <div class="panel-box-title">
+                            <span>🎯 Bước 2: Phân loại Định tuyến Jev</span>
+                            <span id="play-jev-badge"></span>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;" id="play-jev-meta">-</div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+                            <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;">
+                                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Phân cấp (Tier):</div>
+                                <div id="play-tier-val" style="font-size:18px; font-weight:800; margin-top:4px;">-</div>
+                                <div id="play-tier-conf" style="font-size:11px; color:var(--text-muted);">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;">
+                                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Mức suy luận:</div>
+                                <div id="play-effort-val" style="font-size:18px; font-weight:800; margin-top:4px;">-</div>
+                                <div id="play-effort-conf" style="font-size:11px; color:var(--text-muted);">-</div>
+                            </div>
+                        </div>
+
+                        <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Model Upstream được gán:</div>
+                            <div id="play-mapped-model" style="font-size:16px; font-weight:800; color:#38bdf8; font-family:monospace; margin-top:4px;">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= DIFF INSPECTION MODAL ================= -->
+    <div class="modal-overlay" id="diff-modal" onclick="handleModalBackdropClick(event)">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><span>🔍</span> Chi tiết Tinh chỉnh Prompt & So sánh Diff</h3>
+                <button class="modal-close" onclick="closeDiffModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-meta-bar" style="margin-bottom:14px; font-size:12px; color:var(--text-muted); display:flex; flex-wrap:wrap; gap:14px;"></div>
+                
+                <div class="modal-tabs">
+                    <button class="modal-tab-btn active" id="modal-tab-diff" onclick="switchModalTab('diff')">So sánh Khác biệt (Unified Diff)</button>
+                    <button class="modal-tab-btn" id="modal-tab-side" onclick="switchModalTab('side')">Bản đối chiếu (Side-by-side)</button>
+                </div>
+
+                <div id="modal-content-diff">
+                    <div class="diff-block" id="modal-diff-container" style="max-height:450px;"></div>
+                </div>
+
+                <div id="modal-content-side" style="display:none;">
+                    <div class="side-by-side">
+                        <div class="panel-box">
+                            <div class="panel-box-title">
+                                <span>Prompt Gốc (Original)</span>
+                                <button class="btn btn-sm" onclick="copyModalOriginal()">📋 Copy</button>
+                            </div>
+                            <div class="diff-block" id="modal-side-orig" style="max-height:400px;"></div>
+                        </div>
+                        <div class="panel-box">
+                            <div class="panel-box-title">
+                                <span>Prompt Tối ưu (Optimized)</span>
+                                <button class="btn btn-sm" onclick="copyModalOptimized()">📋 Copy</button>
+                            </div>
+                            <div class="diff-block" id="modal-side-opt" style="max-height:400px; color:#38bdf8;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'dashboard';
+        let allDecisions = [];
+        let allDiffs = [];
+        let activeModalRecord = null;
+        let defaultSettingsRef = null;
+
+        function getApiUrl(endpoint) {
+            let base = window.location.pathname;
+            if (base.endsWith('/')) base = base.slice(0, -1);
+            let prefix = base.includes('/jev') ? '/jev' : '';
+            return prefix + '/api/' + endpoint;
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            window.location.hash = tab;
+            
+            document.getElementById('tab-btn-dashboard').className = 'nav-tab' + (tab === 'dashboard' ? ' active' : '');
+            document.getElementById('tab-btn-diffs').className = 'nav-tab' + (tab === 'diffs' ? ' active' : '');
+            document.getElementById('tab-btn-settings').className = 'nav-tab' + (tab === 'settings' ? ' active' : '');
+            document.getElementById('tab-btn-playground').className = 'nav-tab' + (tab === 'playground' ? ' active' : '');
+
+            document.getElementById('view-dashboard').style.display = (tab === 'dashboard' ? 'block' : 'none');
+            document.getElementById('view-diffs').style.display = (tab === 'diffs' ? 'block' : 'none');
+            document.getElementById('view-settings').style.display = (tab === 'settings' ? 'block' : 'none');
+            document.getElementById('view-playground').style.display = (tab === 'playground' ? 'block' : 'none');
+
+            if (tab === 'settings') {
+                loadSettings();
+            } else if (tab === 'diffs') {
+                fetchDiffsData();
+            } else if (tab === 'dashboard') {
+                fetchData();
+            }
+        }
+
+        function refreshCurrentTab() {
+            if (currentTab === 'settings') {
+                loadSettings();
+            } else if (currentTab === 'diffs') {
+                fetchDiffsData();
+            } else if (currentTab === 'dashboard') {
+                fetchData();
+            }
+        }
+
+        /* ================= DASHBOARD & STATS LOGIC ================= */
+        async function fetchData() {
+            if (currentTab !== 'dashboard') return;
+            try {
+                const [statsRes, decRes] = await Promise.all([
+                    fetch(getApiUrl('stats')),
+                    fetch(getApiUrl('decisions?limit=50'))
+                ]);
+                const stats = await statsRes.json();
+                const decisions = await decRes.json();
+
+                updateStats(stats);
+                allDecisions = decisions;
+                renderTable();
+            } catch (err) {
+                console.error("Fetch data error:", err);
+            }
+        }
+
+        function updateStats(stats) {
+            if (!stats) return;
+            document.getElementById('val-total').textContent = stats.total_turns || 0;
+            
+            const upSec = stats.uptime || 0;
+            const upH = Math.floor(upSec / 3600);
+            const upM = Math.floor((upSec % 3600) / 60);
+            document.getElementById('val-uptime').textContent = `Uptime: ${upH}h ${upM}m ${upSec % 60}s`;
+
+            const tc = stats.tier_counts || {};
+            const total = stats.total_turns || 1;
+
+            const luna = tc['luna'] || 0;
+            const terra = tc['terra'] || 0;
+            const sol = tc['sol'] || 0;
+            const astra = tc['astra'] || 0;
+
+            document.getElementById('val-luna').textContent = luna;
+            document.getElementById('val-terra').textContent = terra;
+            document.getElementById('val-sol').textContent = sol;
+            document.getElementById('val-astra').textContent = astra;
+
+            document.getElementById('pct-luna').textContent = Math.round((luna / total) * 100) + '%';
+            document.getElementById('pct-terra').textContent = Math.round((terra / total) * 100) + '%';
+            document.getElementById('pct-sol').textContent = Math.round((sol / total) * 100) + '%';
+            document.getElementById('pct-astra').textContent = Math.round((astra / total) * 100) + '%';
+
+            // Optimizer KPIs
+            const optCount = stats.optimized_count || 0;
+            document.getElementById('val-opt-count').innerHTML = `${optCount} <span style="font-size:14px; color:#34d399; font-weight:normal;">(${stats.optimization_rate || 0}%)</span>`;
+            document.getElementById('val-opt-latency').textContent = `${stats.avg_opt_latency_ms || 0} ms`;
+            document.getElementById('val-opt-ratio').textContent = `${stats.token_expansion_ratio || 1.0}x`;
+
+            if (stats.mapping) {
+                document.getElementById('map-luna').textContent = stats.mapping.luna || '-';
+                document.getElementById('map-terra').textContent = stats.mapping.terra || '-';
+                document.getElementById('map-sol').textContent = stats.mapping.sol || '-';
+                document.getElementById('map-astra').textContent = stats.mapping.astra || '-';
+                document.getElementById('sub-luna').textContent = stats.mapping.luna || '-';
+                document.getElementById('sub-terra').textContent = stats.mapping.terra || '-';
+                document.getElementById('sub-sol').textContent = stats.mapping.sol || '-';
+                document.getElementById('sub-astra').textContent = stats.mapping.astra || '-';
+            }
+
+            document.getElementById('info-upstream').textContent = stats.upstream || '-';
+            document.getElementById('info-jev').textContent = stats.jev_model || '-';
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('decisions-body');
+            const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
+
+            const filtered = allDecisions.filter(d => {
+                if (!query) return true;
+                const p = (d.prompt || '').toLowerCase();
+                const t = (d.tier || '').toLowerCase();
+                const e = (d.reasoning_effort || '').toLowerCase();
+                const m = (d.selected_model || '').toLowerCase();
+                const esc = (d.escalation || '').toLowerCase();
+                const opt = (d.opt_status || '').toLowerCase();
+                return p.includes(query) || t.includes(query) || e.includes(query) || m.includes(query) || esc.includes(query) || opt.includes(query);
+            });
+
+            if (!filtered || filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">' +
+                    (allDecisions.length === 0 ? 'Chưa có quyết định nào trong DB. Hãy gửi câu hỏi qua Codex để bắt đầu!' : 'Không tìm thấy kết quả phù hợp.') +
+                    '</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(d => {
+                const tier = (d.tier || 'unknown').toLowerCase();
+                let tierClass = 'tier-reuse';
+                if (tier === 'luna') tierClass = 'tier-luna';
+                else if (tier === 'terra') tierClass = 'tier-terra';
+                else if (tier === 'sol') tierClass = 'tier-sol';
+                else if (tier === 'astra') tierClass = 'tier-astra';
+
+                const effort = (d.reasoning_effort || 'medium').toLowerCase();
+                let effortClass = 'effort-medium';
+                if (effort === 'low') effortClass = 'effort-low';
+                else if (effort === 'high') effortClass = 'effort-high';
+
+                const conf = d.confidence ? Math.round(d.confidence * 100) + '%' : '-';
+                
+                let turnType = 'Tiếp tục';
+                if (d.escalation && d.escalation.toLowerCase().includes('planning')) {
+                    turnType = '<span class="badge-planning">🎯 Planning</span>';
+                } else if (d.escalation) {
+                    turnType = `<span class="badge-escalate">⚡ ${escapeHtml(d.escalation)}</span>`;
+                } else if (d.is_new_turn) {
+                    turnType = 'Mới (New turn)';
+                }
+
+                // Optimizer cell
+                let optHtml = '<span style="color:var(--text-muted); font-size:12px;">-</span>';
+                if (d.opt_status === 'OPTIMIZED') {
+                    optHtml = `<div style="display:flex; align-items:center; gap:6px;">
+                        <span class="opt-badge opt-badge-success">⚡ OPTIMIZED</span>
+                        <button class="btn btn-sm" style="padding:2px 6px; font-size:10px;" onclick="openDiffModalById(${d.id})">🔍 Diff</button>
+                    </div>`;
+                } else if (d.opt_status && d.opt_status.startsWith('BYPASS_')) {
+                    const reason = d.opt_status.replace('BYPASS_', '');
+                    optHtml = `<span class="opt-badge opt-badge-bypass" title="${escapeHtml(d.opt_status)}">⏭️ ${escapeHtml(reason)}</span>`;
+                } else if (d.opt_status) {
+                    optHtml = `<span class="opt-badge opt-badge-warn">${escapeHtml(d.opt_status)}</span>`;
+                }
+
+                return `<tr>
+                    <td style="color:var(--text-muted); font-size:12px; white-space:nowrap;">${d.datetime || '-'}</td>
+                    <td class="prompt-cell" title="${escapeHtml(d.prompt || '')}">${escapeHtml(d.prompt || '(Trống)')}</td>
+                    <td>${optHtml}</td>
+                    <td><span class="tier-badge ${tierClass}">${tier}</span></td>
+                    <td><span class="effort-badge ${effortClass}">${effort}</span></td>
+                    <td style="font-size:12px; color:var(--text-muted);">${conf}</td>
+                    <td class="model-cell">${escapeHtml(d.selected_model || '-')}</td>
+                    <td class="orig-cell">${escapeHtml(d.original_model || '-')}</td>
+                    <td style="font-size:12px; color:var(--text-muted);">${turnType}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        /* ================= DIFFS AUDIT LOG VIEW ================= */
+        async function fetchDiffsData() {
+            const tbody = document.getElementById('diffs-body');
+            try {
+                const res = await fetch(getApiUrl('diffs?limit=100'));
+                allDiffs = await res.json();
+                renderDiffsTable();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#f87171;">Lỗi tải dữ liệu: ${e.message}</td></tr>`;
+            }
+        }
+
+        function renderDiffsTable() {
+            const tbody = document.getElementById('diffs-body');
+            const query = (document.getElementById('search-diffs-input').value || '').toLowerCase().trim();
+
+            const filtered = allDiffs.filter(d => {
+                if (!query) return true;
+                const p = (d.prompt || '').toLowerCase();
+                const opt = (d.optimized_prompt || '').toLowerCase();
+                const s = (d.opt_status || '').toLowerCase();
+                const m = (d.selected_model || '').toLowerCase();
+                return p.includes(query) || opt.includes(query) || s.includes(query) || m.includes(query);
+            });
+
+            if (!filtered || filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">' +
+                    (allDiffs.length === 0 ? 'Chưa có prompt nào được ghi nhận bởi Optimizer. Hãy gửi prompt qua Codex!' : 'Không tìm thấy kết quả phù hợp.') +
+                    '</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(d => {
+                const isOpt = d.opt_status === 'OPTIMIZED';
+                const statusBadge = isOpt
+                    ? `<span class="opt-badge opt-badge-success">⚡ OPTIMIZED</span>`
+                    : `<span class="opt-badge opt-badge-bypass">${escapeHtml(d.opt_status || 'BYPASS')}</span>`;
+                
+                const lat = d.opt_latency_ms ? `${d.opt_latency_ms} ms` : '-';
+                const tokOrig = d.original_tokens_est || 0;
+                const tokOpt = d.optimized_tokens_est || 0;
+                const delta = tokOpt - tokOrig;
+                const deltaStr = delta > 0 ? `+${delta}` : `${delta}`;
+
+                return `<tr>
+                    <td style="color:var(--text-muted); font-size:12px; white-space:nowrap;">${d.datetime || '-'}</td>
+                    <td class="prompt-cell" style="max-width:260px;" title="${escapeHtml(d.prompt || '')}">${escapeHtml(d.prompt || '-')}</td>
+                    <td class="prompt-cell" style="max-width:280px; color:#38bdf8;" title="${escapeHtml(d.optimized_prompt || '')}">${escapeHtml(d.optimized_prompt || '-')}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-family:monospace; font-size:12px; white-space:nowrap;">${lat}</td>
+                    <td style="font-family:monospace; font-size:12px; white-space:nowrap;">${tokOrig} ➔ ${tokOpt} (${deltaStr})</td>
+                    <td class="model-cell" style="white-space:nowrap;">${escapeHtml(d.selected_model || '-')}</td>
+                    <td><button class="btn btn-sm" onclick="openDiffModalDirect(${JSON.stringify(d).replace(/"/g, '&quot;')})">🔍 Xem Diff</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        /* ================= MODAL DIFF VIEWER ================= */
+        function openDiffModalById(id) {
+            const item = allDecisions.find(x => x.id === id) || allDiffs.find(x => x.id === id);
+            if (item) {
+                openDiffModalDirect(item);
+            }
+        }
+
+        function openDiffModalDirect(record) {
+            activeModalRecord = record;
+            const modal = document.getElementById('diff-modal');
+            const metaBar = document.getElementById('modal-meta-bar');
+            const diffCont = document.getElementById('modal-diff-container');
+            const sideOrig = document.getElementById('modal-side-orig');
+            const sideOpt = document.getElementById('modal-side-opt');
+
+            const isOpt = record.opt_status === 'OPTIMIZED';
+            const tokOrig = record.original_tokens_est || Math.max(1, Math.floor((record.prompt || '').length / 3.8));
+            const tokOpt = record.optimized_tokens_est || Math.max(1, Math.floor((record.optimized_prompt || record.prompt || '').length / 3.8));
+
+            metaBar.innerHTML = `
+                <div><strong>Thời gian:</strong> <span>${record.datetime || '-'}</span></div>
+                <div><strong>Trạng thái:</strong> <span class="opt-badge ${isOpt ? 'opt-badge-success' : 'opt-badge-bypass'}">${escapeHtml(record.opt_status || 'UNKNOWN')}</span></div>
+                <div><strong>Độ trễ:</strong> <span style="color:#38bdf8; font-family:monospace;">${record.opt_latency_ms || 0} ms</span></div>
+                <div><strong>Tokens:</strong> <span style="font-family:monospace;">${tokOrig} ➔ ${tokOpt} (${tokOpt - tokOrig >= 0 ? '+' : ''}${tokOpt - tokOrig})</span></div>
+                <div><strong>Model gán:</strong> <span style="color:#38bdf8; font-family:monospace;">${escapeHtml(record.selected_model || '-')}</span></div>
+            `;
+
+            // Render Diff
+            const diffText = record.diff_summary || '';
+            if (diffText) {
+                diffCont.innerHTML = renderColorizedDiff(diffText);
+            } else if (isOpt) {
+                diffCont.textContent = 'Chưa có unified diff được lưu sẵn.';
+            } else {
+                diffCont.innerHTML = '<span class="diff-line-info">Prompt này được bypass (giữ nguyên bản, không qua chỉnh sửa).</span>';
+            }
+
+            sideOrig.textContent = record.prompt || '(Trống)';
+            sideOpt.textContent = record.optimized_prompt || record.prompt || '(Trống)';
+
+            switchModalTab('diff');
+            modal.style.display = 'flex';
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diff-modal').style.display = 'none';
+            activeModalRecord = null;
+        }
+
+        function handleModalBackdropClick(e) {
+            if (e.target.id === 'diff-modal') {
+                closeDiffModal();
+            }
+        }
+
+        function switchModalTab(tab) {
+            document.getElementById('modal-tab-diff').className = 'modal-tab-btn' + (tab === 'diff' ? ' active' : '');
+            document.getElementById('modal-tab-side').className = 'modal-tab-btn' + (tab === 'side' ? ' active' : '');
+            document.getElementById('modal-content-diff').style.display = (tab === 'diff' ? 'block' : 'none');
+            document.getElementById('modal-content-side').style.display = (tab === 'side' ? 'block' : 'none');
+        }
+
+        function renderColorizedDiff(diffText) {
+            if (!diffText) return '-';
+            const lines = diffText.split('\n');
+            return lines.map(line => {
+                const esc = escapeHtml(line);
+                if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+                    return `<span class="diff-line-info">${esc}</span>`;
+                } else if (line.startsWith('+')) {
+                    return `<span class="diff-line-add">${esc}</span>`;
+                } else if (line.startsWith('-')) {
+                    return `<span class="diff-line-del">${esc}</span>`;
+                }
+                return esc;
+            }).join('\n');
+        }
+
+        function copyModalOriginal() {
+            if (activeModalRecord && activeModalRecord.prompt) {
+                navigator.clipboard.writeText(activeModalRecord.prompt);
+                alert('Đã sao chép prompt gốc vào bộ nhớ tạm!');
+            }
+        }
+
+        function copyModalOptimized() {
+            if (activeModalRecord) {
+                const text = activeModalRecord.optimized_prompt || activeModalRecord.prompt || '';
+                navigator.clipboard.writeText(text);
+                alert('Đã sao chép prompt sau tối ưu vào bộ nhớ tạm!');
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeDiffModal();
+        });
+
+        /* ================= PLAYGROUND LOGIC ================= */
+        function fillPlayground(text) {
+            document.getElementById('play-input').value = text;
+        }
+
+        async function runPipelineTest() {
+            const prompt = document.getElementById('play-input').value.trim();
+            const alertBox = document.getElementById('playground-alert');
+            const btn = document.getElementById('btn-run-pipeline');
+            const force = document.getElementById('play-force-opt').checked;
+
+            if (!prompt) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = '❌ Vui lòng nhập prompt trước khi thử nghiệm!';
+                alertBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang chạy toàn trình...';
+            alertBox.style.display = 'none';
+
+            try {
+                const res = await fetch(getApiUrl('test-pipeline'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, force_optimize: force })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    renderPlaygroundResults(data);
+                } else {
+                    alertBox.className = 'alert-error';
+                    alertBox.innerHTML = `❌ Lỗi thực thi Pipeline: ${data.error}`;
+                    alertBox.style.display = 'block';
+                }
+            } catch (err) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = `❌ Lỗi kết nối: ${err.message}`;
+                alertBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Chạy Toàn trình (Optimize + Jev Route)';
+            }
+        }
+
+        async function runOptimizerTest() {
+            const prompt = document.getElementById('play-input').value.trim();
+            const alertBox = document.getElementById('playground-alert');
+            const btn = document.getElementById('btn-run-opt');
+            const force = document.getElementById('play-force-opt').checked;
+
+            if (!prompt) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = '❌ Vui lòng nhập prompt!';
+                alertBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang tối ưu...';
+            alertBox.style.display = 'none';
+
+            try {
+                const res = await fetch(getApiUrl('test-optimizer'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, force_optimize: force })
+                });
+                const data = await res.json();
+                renderPlaygroundResults({
+                    ...data,
+                    jev_latency_ms: 0,
+                    total_latency_ms: data.opt_latency_ms || 0,
+                    tier: '-',
+                    confidence: 0,
+                    reasoning_effort: '-',
+                    reasoning_conf: 0,
+                    selected_model: 'Chỉ test Optimizer'
+                });
+            } catch (err) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = `❌ Lỗi: ${err.message}`;
+                alertBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Chỉ Test Optimizer';
+            }
+        }
+
+        async function runJevOnlyTest() {
+            const prompt = document.getElementById('play-input').value.trim();
+            const alertBox = document.getElementById('playground-alert');
+            const btn = document.getElementById('btn-run-jev');
+
+            if (!prompt) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = '❌ Vui lòng nhập prompt!';
+                alertBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang phân loại...';
+            alertBox.style.display = 'none';
+
+            try {
+                const res = await fetch(getApiUrl('test-jev?prompt=' + encodeURIComponent(prompt)));
+                const data = await res.json();
+                if (data.success) {
+                    renderPlaygroundResults({
+                        success: true,
+                        raw_prompt: prompt,
+                        optimized_prompt: prompt,
+                        opt_status: 'BYPASS_MANUAL_TEST',
+                        opt_latency_ms: 0,
+                        diff_summary: '',
+                        jev_latency_ms: data.elapsed_ms,
+                        total_latency_ms: data.elapsed_ms,
+                        is_planning: data.is_planning,
+                        tier: data.tier,
+                        confidence: data.confidence,
+                        reasoning_effort: data.reasoning_effort,
+                        reasoning_conf: data.reasoning_conf,
+                        selected_model: data.mapped_model
+                    });
+                } else {
+                    alertBox.className = 'alert-error';
+                    alertBox.innerHTML = `❌ Lỗi Jev: ${data.error}`;
+                    alertBox.style.display = 'block';
+                }
+            } catch (err) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = `❌ Lỗi: ${err.message}`;
+                alertBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🎯 Chỉ Test Jev Phân loại';
+            }
+        }
+
+        function renderPlaygroundResults(data) {
+            const resDiv = document.getElementById('play-results');
+            resDiv.style.display = 'block';
+
+            document.getElementById('play-total-time').textContent = `Tổng thời gian: ${data.total_latency_ms} ms`;
+
+            // Latency Bar
+            const optMs = data.opt_latency_ms || 0;
+            const jevMs = data.jev_latency_ms || 0;
+            const total = Math.max(1, optMs + jevMs);
+            const optPct = Math.round((optMs / total) * 100);
+            const jevPct = 100 - optPct;
+
+            document.getElementById('play-bar-opt').style.width = optPct + '%';
+            document.getElementById('play-bar-jev').style.width = jevPct + '%';
+            document.getElementById('play-latency-legend').innerHTML = `
+                <span style="color:#a78bfa;">Optimizer: ${optMs} ms (${optPct}%)</span> | 
+                <span style="color:#38bdf8;">Jev Router: ${jevMs} ms (${jevPct}%)</span>
+            `;
+
+            // Stage 1
+            const isOpt = data.opt_status === 'OPTIMIZED';
+            document.getElementById('play-opt-badge').innerHTML = isOpt
+                ? `<span class="opt-badge opt-badge-success">⚡ OPTIMIZED</span>`
+                : `<span class="opt-badge opt-badge-bypass">${escapeHtml(data.opt_status || 'BYPASS')}</span>`;
+            document.getElementById('play-opt-meta').textContent = `Thời gian: ${optMs} ms | Trạng thái: ${data.opt_status}`;
+            document.getElementById('play-opt-text').textContent = data.optimized_prompt || data.raw_prompt;
+            
+            if (data.diff_summary) {
+                document.getElementById('play-diff-view').innerHTML = renderColorizedDiff(data.diff_summary);
+            } else {
+                document.getElementById('play-diff-view').innerHTML = '<span class="diff-line-info">Không có thay đổi văn bản (Bypass hoặc không đổi).</span>';
+            }
+
+            // Stage 2
+            let planBadge = '';
+            if (data.is_planning) {
+                planBadge = '<span class="badge-planning">🎯 Planning Boost</span>';
+            }
+            document.getElementById('play-jev-badge').innerHTML = planBadge;
+            document.getElementById('play-jev-meta').textContent = `Thời gian: ${jevMs} ms | Trạng thái: Sẵn sàng định tuyến`;
+
+            const tier = (data.tier || '-').toUpperCase();
+            document.getElementById('play-tier-val').textContent = tier;
+            document.getElementById('play-tier-conf').textContent = `Tin cậy: ${Math.round((data.confidence || 0) * 100)}%`;
+
+            const effort = (data.reasoning_effort || '-').toUpperCase();
+            document.getElementById('play-effort-val').textContent = effort;
+            document.getElementById('play-effort-conf').textContent = `Tin cậy: ${Math.round((data.reasoning_conf || 0) * 100)}%`;
+
+            document.getElementById('play-mapped-model').textContent = data.selected_model || '-';
+
+            resDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        /* ================= SETTINGS LOGIC ================= */
+        let upstreamModelsCache = [];
+
+        async function fetchUpstreamModels(manualClick = false) {
+            const btn = document.getElementById('btn-fetch-models');
+            const alertBox = document.getElementById('settings-alert');
+            const badge = document.getElementById('models-count-badge');
+            if (manualClick) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Đang tải...';
+            }
+            try {
+                const res = await fetch(getApiUrl('upstream-models'));
+                const json = await res.json();
+                if (json.success && Array.isArray(json.models)) {
+                    upstreamModelsCache = json.models;
+                    badge.textContent = `${json.models.length} models khả dụng`;
+                    badge.style.display = 'inline-block';
+                    populateModelSelects(json.models);
+                    if (manualClick) {
+                        alertBox.className = 'alert-success';
+                        alertBox.innerHTML = `✅ Đã tải thành công <strong>${json.models.length}</strong> models từ CLIProxyAPI! Bạn có thể chọn nhanh từ dropdown hoặc gõ tên model để tự hoàn tất.`;
+                        alertBox.style.display = 'block';
+                    }
+                } else {
+                    if (manualClick) {
+                        alertBox.className = 'alert-error';
+                        alertBox.innerHTML = `❌ Không thể tải danh sách model: ${json.error || 'Lỗi không xác định'}`;
+                        alertBox.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                if (manualClick) {
+                    alertBox.className = 'alert-error';
+                    alertBox.innerHTML = `❌ Lỗi kết nối khi tải model: ${e.message}`;
+                    alertBox.style.display = 'block';
+                }
+            } finally {
+                if (manualClick) {
+                    btn.disabled = false;
+                    btn.textContent = '🔄 Lấy danh sách từ CLIProxyAPI';
+                }
+            }
+        }
+
+        function populateModelSelects(models) {
+            const datalist = document.getElementById('upstream-models-list');
+            if (datalist) {
+                datalist.innerHTML = models.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)} (${escapeHtml(m.owned_by)})</option>`).join('');
+            }
+
+            const groups = {
+                'OpenAI / Codex': [],
+                'Anthropic / Claude': [],
+                'Google / Gemini': [],
+                'Khác': []
+            };
+
+            for (const m of models) {
+                const id = m.id.toLowerCase();
+                if (id.startsWith('gpt') || id.startsWith('codex') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('text-') || id.startsWith('chatgpt')) {
+                    groups['OpenAI / Codex'].push(m);
+                } else if (id.startsWith('claude')) {
+                    groups['Anthropic / Claude'].push(m);
+                } else if (id.startsWith('gemini')) {
+                    groups['Google / Gemini'].push(m);
+                } else {
+                    groups['Khác'].push(m);
+                }
+            }
+
+            let optionsHtml = '<option value="">-- Chọn nhanh model từ danh sách --</option>';
+            for (const [groupName, groupModels] of Object.entries(groups)) {
+                if (groupModels.length === 0) continue;
+                optionsHtml += `<optgroup label="${groupName} (${groupModels.length})">`;
+                for (const m of groupModels) {
+                    optionsHtml += `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}</option>`;
+                }
+                optionsHtml += `</optgroup>`;
+            }
+
+            const tiers = ['luna', 'terra', 'sol', 'astra', 'fallback'];
+            for (const tier of tiers) {
+                const sel = document.getElementById('quick-select-' + tier);
+                if (sel) {
+                    sel.innerHTML = optionsHtml;
+                    const curVal = document.getElementById('set-model-' + tier).value;
+                    if (curVal) {
+                        sel.value = curVal;
+                    }
+                }
+            }
+        }
+
+        function applyModelChoice(tier, value) {
+            if (!value) return;
+            const input = document.getElementById('set-model-' + tier);
+            if (input) {
+                input.value = value;
+                input.style.borderColor = 'var(--accent)';
+                setTimeout(() => { input.style.borderColor = ''; }, 600);
+            }
+        }
+
+        async function loadSettings() {
+            const alertBox = document.getElementById('settings-alert');
+            try {
+                const res = await fetch(getApiUrl('settings'));
+                const data = await res.json();
+                defaultSettingsRef = data;
+
+                // Populate models
+                const m = data.models || {};
+                document.getElementById('set-model-luna').value = m.luna || '';
+                document.getElementById('set-model-terra').value = m.terra || '';
+                document.getElementById('set-model-sol').value = m.sol || '';
+                document.getElementById('set-model-astra').value = m.astra || '';
+                document.getElementById('set-model-fallback').value = m.fallback || '';
+
+                // Populate upstream & jev
+                document.getElementById('set-upstream-url').value = (data.upstream && data.upstream.url) || '';
+                document.getElementById('set-upstream-key').placeholder = (data.upstream && data.upstream.api_key_masked) || 'Để trống nếu không đổi';
+                document.getElementById('set-upstream-key').value = '';
+                document.getElementById('set-jev-model').value = (data.jev && data.jev.model) || '';
+                document.getElementById('set-jev-key').placeholder = (data.jev && data.jev.api_key_masked) || 'Để trống nếu không đổi';
+                document.getElementById('set-jev-key').value = '';
+
+                // Populate rules
+                const r = data.routing_rules || {};
+                document.getElementById('set-rule-rewrite').checked = !!r.rewrite_enabled;
+                document.getElementById('set-rule-planning').checked = !!r.planning_boost;
+                document.getElementById('set-rule-escalate').checked = !!r.auto_escalation;
+                document.getElementById('set-rule-cooldown').value = r.escalation_cooldown || 20;
+                document.getElementById('set-keywords-planning').value = (r.planning_keywords || []).join('\n');
+                document.getElementById('set-keywords-arch').value = (r.architecture_keywords || []).join('\n');
+
+                // Populate optimizer
+                const opt = data.optimizer || {};
+                document.getElementById('set-opt-enabled').checked = !!opt.enabled;
+                document.getElementById('set-opt-url').value = opt.url || 'https://openrouter.ai/api/v1/chat/completions';
+                document.getElementById('set-opt-model').value = opt.model || 'google/gemini-2.5-flash';
+                document.getElementById('set-opt-key').placeholder = opt.api_key_masked || 'Dùng chung key Jev nếu để trống';
+                document.getElementById('set-opt-key').value = '';
+                document.getElementById('set-opt-timeout').value = opt.timeout_seconds || 8.0;
+                document.getElementById('set-opt-max-tokens').value = opt.max_tokens || 1200;
+                document.getElementById('set-opt-temp').value = opt.temperature !== undefined ? opt.temperature : 0.3;
+                document.getElementById('set-opt-min-chars').value = opt.min_character_length || 12;
+                document.getElementById('set-opt-min-words').value = opt.min_word_count || 3;
+                document.getElementById('set-opt-preserve-vars').checked = opt.preserve_variables_strict !== false;
+                document.getElementById('set-opt-skip-short').checked = opt.skip_short_confirmations !== false;
+                document.getElementById('set-opt-loop-markers').value = (opt.autonomous_loop_markers || []).join('\n');
+                document.getElementById('set-opt-sys-prompt').value = opt.system_prompt || '';
+
+                // Update header badge
+                const optBadge = document.getElementById('header-opt-badge');
+                if (optBadge) {
+                    optBadge.style.display = opt.enabled ? 'inline-flex' : 'none';
+                }
+
+                // Load upstream models
+                fetchUpstreamModels(false);
+            } catch (err) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = `❌ Không thể tải cài đặt: ${err.message}`;
+                alertBox.style.display = 'block';
+            }
+        }
+
+        async function saveSettings() {
+            const btn = document.getElementById('btn-save-settings');
+            const alertBox = document.getElementById('settings-alert');
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang lưu...';
+            alertBox.style.display = 'none';
+
+            const payload = {
+                models: {
+                    luna: document.getElementById('set-model-luna').value.trim(),
+                    terra: document.getElementById('set-model-terra').value.trim(),
+                    sol: document.getElementById('set-model-sol').value.trim(),
+                    astra: document.getElementById('set-model-astra').value.trim(),
+                    fallback: document.getElementById('set-model-fallback').value.trim()
+                },
+                upstream: {
+                    url: document.getElementById('set-upstream-url').value.trim(),
+                    api_key: document.getElementById('set-upstream-key').value.trim()
+                },
+                jev: {
+                    model: document.getElementById('set-jev-model').value.trim(),
+                    api_key: document.getElementById('set-jev-key').value.trim()
+                },
+                routing_rules: {
+                    rewrite_enabled: document.getElementById('set-rule-rewrite').checked,
+                    planning_boost: document.getElementById('set-rule-planning').checked,
+                    auto_escalation: document.getElementById('set-rule-escalate').checked,
+                    escalation_cooldown: parseFloat(document.getElementById('set-rule-cooldown').value) || 20.0,
+                    planning_keywords: document.getElementById('set-keywords-planning').value.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean),
+                    architecture_keywords: document.getElementById('set-keywords-arch').value.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean)
+                },
+                optimizer: {
+                    enabled: document.getElementById('set-opt-enabled').checked,
+                    url: document.getElementById('set-opt-url').value.trim(),
+                    model: document.getElementById('set-opt-model').value.trim(),
+                    api_key: document.getElementById('set-opt-key').value.trim(),
+                    timeout_seconds: parseFloat(document.getElementById('set-opt-timeout').value) || 8.0,
+                    max_tokens: parseInt(document.getElementById('set-opt-max-tokens').value) || 1200,
+                    temperature: parseFloat(document.getElementById('set-opt-temp').value) || 0.3,
+                    min_character_length: parseInt(document.getElementById('set-opt-min-chars').value) || 12,
+                    min_word_count: parseInt(document.getElementById('set-opt-min-words').value) || 3,
+                    preserve_variables_strict: document.getElementById('set-opt-preserve-vars').checked,
+                    skip_short_confirmations: document.getElementById('set-opt-skip-short').checked,
+                    autonomous_loop_markers: document.getElementById('set-opt-loop-markers').value.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean),
+                    system_prompt: document.getElementById('set-opt-sys-prompt').value.trim()
+                }
+            };
+
+            try {
+                const res = await fetch(getApiUrl('settings'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const resJson = await res.json();
+                if (resJson.success) {
+                    alertBox.className = 'alert-success';
+                    alertBox.innerHTML = `✅ ${resJson.message || 'Cấu hình đã được lưu và áp dụng thành công!'}`;
+                    loadSettings();
+                } else {
+                    alertBox.className = 'alert-error';
+                    alertBox.innerHTML = `❌ Lỗi khi lưu: ${resJson.message || 'Thất bại'}`;
+                }
+            } catch (err) {
+                alertBox.className = 'alert-error';
+                alertBox.innerHTML = `❌ Lỗi kết nối khi lưu: ${err.message}`;
+            } finally {
+                alertBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '💾 Lưu Cấu hình & Áp dụng ngay';
+            }
+        }
+
+        function resetDefaultSettings() {
+            if (!confirm("Bạn có chắc chắn muốn khôi phục cấu hình mặc định ban đầu không?")) return;
+            document.getElementById('set-model-luna').value = 'gpt-6-luna';
+            document.getElementById('set-model-terra').value = 'gpt-6.1-sol';
+            document.getElementById('set-model-sol').value = 'gpt-6-astra';
+            document.getElementById('set-model-astra').value = 'gpt-6-astra';
+            document.getElementById('set-model-fallback').value = 'gpt-6.1-sol';
+            document.getElementById('set-upstream-url').value = 'http://127.0.0.1:8317';
+            document.getElementById('set-upstream-key').value = '';
+            document.getElementById('set-jev-model').value = 'typesafe/jev-1.13';
+            document.getElementById('set-rule-rewrite').checked = true;
+            document.getElementById('set-rule-planning').checked = true;
+            document.getElementById('set-rule-escalate').checked = true;
+            document.getElementById('set-rule-cooldown').value = 20;
+            document.getElementById('set-opt-enabled').checked = true;
+            document.getElementById('set-opt-url').value = 'https://openrouter.ai/api/v1/chat/completions';
+            document.getElementById('set-opt-model').value = 'google/gemini-2.5-flash';
+            document.getElementById('set-opt-timeout').value = 8.0;
+            document.getElementById('set-opt-max-tokens').value = 1200;
+            document.getElementById('set-opt-temp').value = 0.3;
+            document.getElementById('set-opt-min-chars').value = 12;
+            document.getElementById('set-opt-min-words').value = 3;
+            document.getElementById('set-opt-preserve-vars').checked = true;
+            document.getElementById('set-opt-skip-short').checked = true;
+            saveSettings();
+        }
+
+        function toggleKeyVisibility() {
+            const input = document.getElementById('set-jev-key');
+            const btn = document.getElementById('btn-toggle-key');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🔒';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        function toggleUpstreamKeyVisibility() {
+            const input = document.getElementById('set-upstream-key');
+            const btn = document.getElementById('btn-toggle-upstream-key');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🔒';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        function toggleOptKeyVisibility() {
+            const input = document.getElementById('set-opt-key');
+            const btn = document.getElementById('btn-toggle-opt-key');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🔒';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Initialize based on URL hash
+        const initialTab = (window.location.hash || '').replace('#', '');
+        if (['dashboard', 'diffs', 'settings', 'playground'].includes(initialTab)) {
+            switchTab(initialTab);
+        } else {
+            switchTab('dashboard');
+        }
+
+        setInterval(() => {
+            if (currentTab === 'dashboard') {
+                fetchData();
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

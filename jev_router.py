@@ -13,6 +13,7 @@ Configuration: environment variables, see .env.example and README.md.
 from __future__ import annotations
 
 import collections
+import difflib
 import json
 import os
 import re
@@ -20,6 +21,7 @@ import sqlite3
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -144,14 +146,20 @@ def init_db() -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_decisions_tier ON decisions(tier)")
             
             # Migration check for existing databases
-            try:
-                conn.execute("ALTER TABLE decisions ADD COLUMN reasoning_effort TEXT")
-            except Exception:
-                pass
-            try:
-                conn.execute("ALTER TABLE decisions ADD COLUMN reasoning_conf REAL")
-            except Exception:
-                pass
+            for col_name, col_type in (
+                ("reasoning_effort", "TEXT"),
+                ("reasoning_conf", "REAL"),
+                ("opt_status", "TEXT"),
+                ("optimized_prompt", "TEXT"),
+                ("opt_latency_ms", "REAL"),
+                ("diff_summary", "TEXT"),
+                ("original_tokens_est", "INTEGER"),
+                ("optimized_tokens_est", "INTEGER"),
+            ):
+                try:
+                    conn.execute(f"ALTER TABLE decisions ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
 
             conn.commit()
             conn.close()
@@ -172,15 +180,17 @@ def log_decision_db(meta: dict, session_id: str = "") -> None:
                     timestamp, datetime, session_id, is_new_turn,
                     prompt, tier, confidence, selected_model,
                     original_model, probabilities, escalation, error_msg,
-                    reasoning_effort, reasoning_conf
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reasoning_effort, reasoning_conf,
+                    opt_status, optimized_prompt, opt_latency_ms,
+                    diff_summary, original_tokens_est, optimized_tokens_est
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     now,
                     dt_str,
                     session_id,
                     1 if meta.get("new") else 0,
-                    meta.get("prompt") or "",
+                    meta.get("raw_prompt") or meta.get("prompt") or "",
                     meta.get("tier") or "",
                     float(meta.get("conf") or 0.0),
                     meta.get("out") or "",
@@ -190,6 +200,12 @@ def log_decision_db(meta: dict, session_id: str = "") -> None:
                     meta.get("err") or meta.get("esc_err") or "",
                     meta.get("effort") or "medium",
                     float(meta.get("effort_conf") or 0.0),
+                    meta.get("opt_status") or "",
+                    meta.get("optimized_prompt") or "",
+                    float(meta.get("opt_latency_ms") or 0.0),
+                    meta.get("diff_summary") or "",
+                    int(meta.get("original_tokens_est") or 0),
+                    int(meta.get("optimized_tokens_est") or 0),
                 ),
             )
             conn.commit()
@@ -219,6 +235,18 @@ def query_stats() -> dict:
             cur.execute("SELECT reasoning_effort, COUNT(*) FROM decisions WHERE reasoning_effort IS NOT NULL AND reasoning_effort != '' GROUP BY reasoning_effort")
             effort_counts = {row[0]: row[1] for row in cur.fetchall()}
 
+            # Optimizer metrics
+            cur.execute("SELECT COUNT(*) FROM decisions WHERE opt_status = 'OPTIMIZED'")
+            optimized_count = cur.fetchone()[0]
+
+            cur.execute("SELECT AVG(opt_latency_ms) FROM decisions WHERE opt_status = 'OPTIMIZED'")
+            avg_opt_latency = cur.fetchone()[0] or 0.0
+
+            cur.execute("SELECT SUM(original_tokens_est), SUM(optimized_tokens_est) FROM decisions WHERE opt_status = 'OPTIMIZED'")
+            tok_row = cur.fetchone()
+            sum_orig_tok = (tok_row[0] or 0) if tok_row else 0
+            sum_opt_tok = (tok_row[1] or 0) if tok_row else 0
+
             conn.close()
             return {
                 "total_records": total,
@@ -226,6 +254,10 @@ def query_stats() -> dict:
                 "tier_counts": tier_counts,
                 "model_counts": model_counts,
                 "effort_counts": effort_counts,
+                "optimized_count": optimized_count,
+                "avg_opt_latency_ms": round(avg_opt_latency, 1),
+                "optimization_rate": round((optimized_count / total_turns * 100), 1) if total_turns > 0 else 0.0,
+                "token_expansion_ratio": round((sum_opt_tok / sum_orig_tok), 2) if sum_orig_tok > 0 else 1.0,
                 "mapping": MAP,
                 "upstream": UPSTREAM_ORIGIN,
                 "jev_model": JEV_MODEL,
@@ -239,6 +271,10 @@ def query_stats() -> dict:
                 "tier_counts": {},
                 "model_counts": {},
                 "effort_counts": {},
+                "optimized_count": 0,
+                "avg_opt_latency_ms": 0.0,
+                "optimization_rate": 0.0,
+                "token_expansion_ratio": 1.0,
                 "mapping": MAP,
                 "upstream": UPSTREAM_ORIGIN,
                 "jev_model": JEV_MODEL,
@@ -259,6 +295,31 @@ def query_recent_decisions(limit: int = 50) -> list[dict]:
             return rows
         except Exception as e:
             print(f"[DB ERROR] query_recent_decisions: {e}", flush=True)
+            return []
+
+
+def query_recent_diffs(limit: int = 50) -> list[dict]:
+    """Query recent prompt diffs ordered by timestamp descending."""
+    with DB_LOCK:
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, timestamp, datetime, prompt, optimized_prompt, opt_status, opt_latency_ms,
+                       diff_summary, original_tokens_est, optimized_tokens_est, selected_model, tier, reasoning_effort
+                FROM decisions
+                WHERE opt_status IS NOT NULL AND opt_status != ''
+                ORDER BY timestamp DESC LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+            conn.close()
+            return rows
+        except Exception as e:
+            print(f"[DB ERROR] query_recent_diffs: {e}", flush=True)
             return []
 
 
@@ -564,6 +625,245 @@ def compile_keyword_rx(keywords: list[str]) -> re.Pattern:
 PLANNING_RX = compile_keyword_rx(CURRENT_PLANNING_KEYWORDS)
 ARCH_RX = compile_keyword_rx(CURRENT_ARCH_KEYWORDS)
 
+# ================= PROMPT OPTIMIZER MODULE =================
+PLACEHOLDER_REGEX = re.compile(r"(\{\{[^{}\n\r]+\}\}|\$\{[^{}\n\r]+\}|\b\{[a-zA-Z0-9_]+\}\b)")
+
+AUTOMATED_PATTERNS = [
+    re.compile(r"(?i)(Traceback \(most recent|exit code:? *\d+|exited with code \d+|exit status \d+)"),
+    re.compile(r"(?i)(\[tool_output\]|\[execution_result\]|COMMAND_EXIT_CODE|command not found)"),
+    re.compile(r"(?i)(npm ERR!|fatal: not a git repository|SyntaxError:|ImportError:|AssertionError)"),
+    re.compile(r"(?i)(diff --git a\/|index [0-9a-f]{7}\.\.[0-9a-f]{7}|@@ -\d+,\d+ \+\d+,\d+ @@)"),
+    re.compile(r"(?i)(superpowers:|agent_loop|<system_generated>|subagent-driven-development)"),
+]
+
+SHORT_CONFIRMATIONS = {
+    "yes", "no", "ok", "okay", "sure", "proceed", "continue", "y", "n",
+    "done", "cancel", "confirm", "approve", "go ahead", "run it", "looks good",
+    "lgtm", "đồng ý", "tiếp tục", "chạy đi", "ok rồi", "được rồi", "ok tiếp tục đi",
+    "tiếp tục đi", "làm đi", "chạy tiếp", "cứ làm đi", "xong rồi", "được đấy", "tiếp đi"
+}
+
+DEFAULT_OPTIMIZER_SYSTEM_PROMPT = (
+    "You are an expert Prompt Optimization Engine. Your task is to rewrite and refine human user prompts "
+    "before they are passed to an upstream reasoning LLM.\n\n"
+    "CRITICAL RULES:\n"
+    "1. PRESERVE CORE INTENT & TECHNICAL CONSTRAINTS: Never change the fundamental goal, technical stack, or constraints.\n"
+    "2. PRESERVE PLACEHOLDERS & CODE: Any {{variable}}, ${variable}, file paths, or exact code blocks MUST be retained exactly.\n"
+    "3. CLARIFY & STRUCTURE: Disambiguate vague terminology, add missing context structure, and make output format requirements concrete.\n"
+    "4. NO CHATTER / DIRECT OUTPUT ONLY: Output ONLY the enhanced prompt content directly. Do not include introductory or explanatory remarks."
+)
+
+OPT_ENABLED = True
+OPT_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPT_MODEL = "google/gemini-2.5-flash"
+OPT_KEY = ""
+OPT_TIMEOUT = 3.5
+OPT_TEMPERATURE = 0.3
+OPT_MAX_TOKENS = 1200
+OPT_SYSTEM_PROMPT = DEFAULT_OPTIMIZER_SYSTEM_PROMPT
+OPT_MIN_CHARS = 12
+OPT_MIN_WORDS = 3
+OPT_PRESERVE_VARS = True
+OPT_SKIP_SHORT = True
+OPT_LOOP_MARKERS = [
+    "superpowers:",
+    "autonomous execution",
+    "agent_loop",
+    "subagent",
+    "tool_call_id",
+    "Traceback (most recent",
+    "exit code:",
+    "diff --git",
+]
+
+
+def extract_placeholders(text: str) -> set[str]:
+    return set(PLACEHOLDER_REGEX.findall(text))
+
+
+def verify_variable_integrity(original: str, optimized: str) -> tuple[bool, list[str]]:
+    orig_placeholders = extract_placeholders(original)
+    if not orig_placeholders:
+        return True, []
+    missing = [ph for ph in orig_placeholders if ph not in optimized]
+    return len(missing) == 0, missing
+
+
+def check_prompt_heuristic(candidate_content: str) -> tuple[bool, str]:
+    if not candidate_content:
+        return False, "EMPTY_PROMPT"
+
+    cleaned_lower = candidate_content.strip().lower()
+    words = cleaned_lower.split()
+
+    if OPT_SKIP_SHORT:
+        if cleaned_lower in SHORT_CONFIRMATIONS:
+            return False, "SHORT_CONFIRMATION"
+        if len(words) <= 4 and any(sc in cleaned_lower for sc in ("tiếp tục", "đồng ý", "chạy đi", "go ahead", "looks good", "ok rồi", "được rồi", "làm đi")):
+            return False, "SHORT_CONFIRMATION"
+
+    if len(candidate_content) < OPT_MIN_CHARS or len(words) < OPT_MIN_WORDS:
+        return False, "BELOW_MIN_THRESHOLD"
+
+    for rx in AUTOMATED_PATTERNS:
+        if rx.search(candidate_content):
+            return False, "AUTOMATED_EXECUTION_TRACE"
+
+    for marker in OPT_LOOP_MARKERS:
+        if marker.lower() in cleaned_lower:
+            return False, f"EXCLUDED_MARKER:{marker}"
+
+    return True, "HUMAN_INPUT_VERIFIED"
+
+
+def run_prompt_optimizer(original_prompt: str) -> tuple[str, bool, str, float]:
+    """Runs prompt through the optimizer model before Jev classification."""
+    if not OPT_ENABLED:
+        return original_prompt, False, "OPTIMIZER_DISABLED", 0.0
+
+    api_key = OPT_KEY or KEY
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Jev-Codex-Router/1.0",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    payload = {
+        "model": OPT_MODEL,
+        "temperature": OPT_TEMPERATURE,
+        "max_tokens": OPT_MAX_TOKENS,
+        "messages": [
+            {"role": "system", "content": OPT_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Please optimize and clarify the following raw human prompt. "
+                    f"Retain all technical details, variable placeholders, and constraints. "
+                    f"Output ONLY the optimized prompt directly:\n\n{original_prompt}"
+                ),
+            },
+        ],
+    }
+
+    t0 = time.time()
+    try:
+        req = urllib.request.Request(OPT_URL, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=OPT_TIMEOUT) as resp:
+            raw_resp = json.loads(resp.read().decode("utf-8"))
+
+        latency_ms = round((time.time() - t0) * 1000, 1)
+        choices = raw_resp.get("choices") or []
+        if not choices or not isinstance(choices, list):
+            return original_prompt, False, "FALLBACK_EMPTY_CHOICES", latency_ms
+
+        opt_text = choices[0].get("message", {}).get("content", "").strip()
+        if not opt_text:
+            return original_prompt, False, "FALLBACK_EMPTY_CONTENT", latency_ms
+
+        if opt_text.startswith("```") and opt_text.endswith("```"):
+            lines = opt_text.splitlines()
+            if len(lines) >= 3:
+                opt_text = "\n".join(lines[1:-1]).strip()
+
+        if OPT_PRESERVE_VARS:
+            valid, missing = verify_variable_integrity(original_prompt, opt_text)
+            if not valid:
+                return original_prompt, False, f"FALLBACK_VARIABLE_MUTATED:{','.join(missing)}", latency_ms
+
+        return opt_text, True, "OPTIMIZED", latency_ms
+
+    except urllib.error.HTTPError as e:
+        latency_ms = round((time.time() - t0) * 1000, 1)
+        err_msg = f"HTTP_{e.code}"
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")
+            err_json = json.loads(err_body)
+            err_msg += f": {err_json.get('error', {}).get('message', err_body[:100])}"
+        except Exception:
+            pass
+        return original_prompt, False, f"FALLBACK_ERROR:{err_msg}", latency_ms
+
+    except urllib.error.URLError as e:
+        latency_ms = round((time.time() - t0) * 1000, 1)
+        if "timed out" in str(e).lower() or isinstance(e.reason, TimeoutError):
+            return original_prompt, False, "FALLBACK_TIMEOUT", latency_ms
+        return original_prompt, False, f"FALLBACK_NETWORK_ERROR:{str(e.reason)}", latency_ms
+
+    except Exception as e:
+        latency_ms = round((time.time() - t0) * 1000, 1)
+        return original_prompt, False, f"FALLBACK_EXCEPTION:{str(e)}", latency_ms
+
+
+def generate_diff_summary(original: str, optimized: str) -> dict:
+    orig_chars = len(original)
+    opt_chars = len(optimized)
+    orig_tokens_est = max(1, int(orig_chars / 3.8))
+    opt_tokens_est = max(1, int(opt_chars / 3.8))
+
+    diff_lines = list(difflib.unified_diff(
+        original.splitlines(keepends=True),
+        optimized.splitlines(keepends=True),
+        fromfile="Original",
+        tofile="Optimized",
+        n=3
+    ))
+    return {
+        "original_tokens_est": orig_tokens_est,
+        "optimized_tokens_est": opt_tokens_est,
+        "token_delta": opt_tokens_est - orig_tokens_est,
+        "unified_diff": "".join(diff_lines)
+    }
+
+
+def update_last_user_prompt(body: dict, new_text: str) -> bool:
+    """Updates the content of the latest human user message in body in-place."""
+    if "input" in body and isinstance(body["input"], str):
+        body["input"] = new_text
+        return True
+    if "messages" in body and isinstance(body["messages"], str):
+        body["messages"] = new_text
+        return True
+
+    items = body.get("input")
+    if not isinstance(items, list):
+        items = body.get("messages")
+    if not isinstance(items, list):
+        return False
+
+    for it in reversed(items):
+        if not isinstance(it, dict):
+            continue
+        typ = it.get("type") or ""
+        role = it.get("role") or ""
+        if typ in TOOL_TYPES or role == "tool":
+            return False
+        if role != "user":
+            continue
+
+        content = it.get("content")
+        if isinstance(content, str):
+            it["content"] = new_text
+            return True
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    if "text" in part:
+                        part["text"] = new_text
+                        return True
+                    if "input_text" in part:
+                        part["input_text"] = new_text
+                        return True
+            it["content"] = new_text
+            return True
+        elif "text" in it:
+            it["text"] = new_text
+            return True
+        else:
+            it["content"] = new_text
+            return True
+    return False
+
 
 def sync_to_env() -> None:
     """Sync model and routing configurations back to .env file."""
@@ -623,6 +923,15 @@ def get_current_settings() -> dict:
             u_key_masked = UPSTREAM_KEY[:7] + "..." + UPSTREAM_KEY[-4:]
         else:
             u_key_masked = "sk-***"
+    
+    effective_opt_key = OPT_KEY or KEY
+    opt_key_masked = ""
+    if effective_opt_key:
+        if len(effective_opt_key) > 12:
+            opt_key_masked = effective_opt_key[:7] + "..." + effective_opt_key[-4:]
+        else:
+            opt_key_masked = "sk-***"
+
     return {
         "models": {
             "luna": MAP.get("luna", "gpt-6-luna"),
@@ -647,6 +956,21 @@ def get_current_settings() -> dict:
             "escalation_cooldown": ERR_COOLDOWN,
             "planning_keywords": CURRENT_PLANNING_KEYWORDS,
             "architecture_keywords": CURRENT_ARCH_KEYWORDS,
+        },
+        "optimizer": {
+            "enabled": OPT_ENABLED,
+            "url": OPT_URL,
+            "model": OPT_MODEL,
+            "api_key_masked": opt_key_masked,
+            "timeout_seconds": OPT_TIMEOUT,
+            "temperature": OPT_TEMPERATURE,
+            "max_tokens": OPT_MAX_TOKENS,
+            "system_prompt": OPT_SYSTEM_PROMPT,
+            "min_character_length": OPT_MIN_CHARS,
+            "min_word_count": OPT_MIN_WORDS,
+            "preserve_variables_strict": OPT_PRESERVE_VARS,
+            "skip_short_confirmations": OPT_SKIP_SHORT,
+            "autonomous_loop_markers": OPT_LOOP_MARKERS,
         },
     }
 
@@ -680,6 +1004,8 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
     global MAP, RANK, DEFAULT_MODEL, UPSTREAM_ORIGIN, UPSTREAM_KEY, JEV_URL, JEV_MODEL, REWRITE
     global PLANNING_BOOST, AUTO_ESCALATION, ERR_COOLDOWN, PLANNING_RX, ARCH_RX
     global CURRENT_PLANNING_KEYWORDS, CURRENT_ARCH_KEYWORDS, KEY
+    global OPT_ENABLED, OPT_URL, OPT_MODEL, OPT_KEY, OPT_TIMEOUT, OPT_TEMPERATURE, OPT_MAX_TOKENS
+    global OPT_SYSTEM_PROMPT, OPT_MIN_CHARS, OPT_MIN_WORDS, OPT_PRESERVE_VARS, OPT_SKIP_SHORT, OPT_LOOP_MARKERS
     try:
         models = data.get("models") or {}
         if models.get("luna"):
@@ -740,6 +1066,54 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
             CURRENT_ARCH_KEYWORDS = [x for x in raw_a if x]
             ARCH_RX = compile_keyword_rx(CURRENT_ARCH_KEYWORDS)
 
+        # Prompt Optimizer Settings
+        opt_cfg = data.get("optimizer") or {}
+        if "enabled" in opt_cfg:
+            OPT_ENABLED = bool(opt_cfg["enabled"])
+        if opt_cfg.get("url"):
+            OPT_URL = opt_cfg["url"].strip()
+        if opt_cfg.get("model"):
+            OPT_MODEL = opt_cfg["model"].strip()
+        new_opt_key = opt_cfg.get("api_key") or ""
+        if new_opt_key and not new_opt_key.startswith("sk-or-v1-...") and "..." not in new_opt_key:
+            OPT_KEY = new_opt_key.strip()
+        if "timeout_seconds" in opt_cfg:
+            try:
+                OPT_TIMEOUT = float(opt_cfg["timeout_seconds"])
+            except Exception:
+                pass
+        if "temperature" in opt_cfg:
+            try:
+                OPT_TEMPERATURE = float(opt_cfg["temperature"])
+            except Exception:
+                pass
+        if "max_tokens" in opt_cfg:
+            try:
+                OPT_MAX_TOKENS = int(opt_cfg["max_tokens"])
+            except Exception:
+                pass
+        if opt_cfg.get("system_prompt"):
+            OPT_SYSTEM_PROMPT = opt_cfg["system_prompt"].strip()
+        if "min_character_length" in opt_cfg:
+            try:
+                OPT_MIN_CHARS = int(opt_cfg["min_character_length"])
+            except Exception:
+                pass
+        if "min_word_count" in opt_cfg:
+            try:
+                OPT_MIN_WORDS = int(opt_cfg["min_word_count"])
+            except Exception:
+                pass
+        if "preserve_variables_strict" in opt_cfg:
+            OPT_PRESERVE_VARS = bool(opt_cfg["preserve_variables_strict"])
+        if "skip_short_confirmations" in opt_cfg:
+            OPT_SKIP_SHORT = bool(opt_cfg["skip_short_confirmations"])
+        if "autonomous_loop_markers" in opt_cfg:
+            raw_m = opt_cfg["autonomous_loop_markers"]
+            if isinstance(raw_m, str):
+                raw_m = [x.strip() for x in raw_m.replace(",", "\n").split("\n")]
+            OPT_LOOP_MARKERS = [x for x in raw_m if x]
+
         with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(get_current_settings(), f, indent=2, ensure_ascii=False)
 
@@ -753,6 +1127,8 @@ def init_settings() -> None:
     global MAP, RANK, DEFAULT_MODEL, UPSTREAM_ORIGIN, UPSTREAM_KEY, JEV_URL, JEV_MODEL, REWRITE
     global PLANNING_BOOST, AUTO_ESCALATION, ERR_COOLDOWN, PLANNING_RX, ARCH_RX
     global CURRENT_PLANNING_KEYWORDS, CURRENT_ARCH_KEYWORDS, KEY
+    global OPT_ENABLED, OPT_URL, OPT_MODEL, OPT_KEY, OPT_TIMEOUT, OPT_TEMPERATURE, OPT_MAX_TOKENS
+    global OPT_SYSTEM_PROMPT, OPT_MIN_CHARS, OPT_MIN_WORDS, OPT_PRESERVE_VARS, OPT_SKIP_SHORT, OPT_LOOP_MARKERS
     if os.path.isfile(SETTINGS_PATH):
         try:
             with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
@@ -798,6 +1174,34 @@ def init_settings() -> None:
                 CURRENT_PLANNING_KEYWORDS = [k.strip() for k in rules["planning_keywords"] if k.strip()]
             if rules.get("architecture_keywords"):
                 CURRENT_ARCH_KEYWORDS = [k.strip() for k in rules["architecture_keywords"] if k.strip()]
+
+            opt_cfg = data.get("optimizer") or {}
+            if "enabled" in opt_cfg:
+                OPT_ENABLED = bool(opt_cfg["enabled"])
+            if opt_cfg.get("url"):
+                OPT_URL = opt_cfg["url"]
+            if opt_cfg.get("model"):
+                OPT_MODEL = opt_cfg["model"]
+            if opt_cfg.get("api_key"):
+                OPT_KEY = opt_cfg["api_key"]
+            if "timeout_seconds" in opt_cfg:
+                OPT_TIMEOUT = float(opt_cfg["timeout_seconds"])
+            if "temperature" in opt_cfg:
+                OPT_TEMPERATURE = float(opt_cfg["temperature"])
+            if "max_tokens" in opt_cfg:
+                OPT_MAX_TOKENS = int(opt_cfg["max_tokens"])
+            if opt_cfg.get("system_prompt"):
+                OPT_SYSTEM_PROMPT = opt_cfg["system_prompt"]
+            if "min_character_length" in opt_cfg:
+                OPT_MIN_CHARS = int(opt_cfg["min_character_length"])
+            if "min_word_count" in opt_cfg:
+                OPT_MIN_WORDS = int(opt_cfg["min_word_count"])
+            if "preserve_variables_strict" in opt_cfg:
+                OPT_PRESERVE_VARS = bool(opt_cfg["preserve_variables_strict"])
+            if "skip_short_confirmations" in opt_cfg:
+                OPT_SKIP_SHORT = bool(opt_cfg["skip_short_confirmations"])
+            if opt_cfg.get("autonomous_loop_markers"):
+                OPT_LOOP_MARKERS = [x.strip() for x in opt_cfg["autonomous_loop_markers"] if x.strip()]
         except Exception as e:
             print(f"[SETTINGS LOAD ERROR] {e}", flush=True)
 
@@ -878,7 +1282,7 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
     )
     meta["sid"] = sid
 
-    if not REWRITE or "/responses" not in path.split("?", 1)[0]:
+    if not REWRITE or ("/responses" not in path.split("?", 1)[0] and "/chat/completions" not in path.split("?", 1)[0]):
         meta["out"] = incoming
         return raw, meta
 
@@ -894,6 +1298,40 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
         effort = LEASE_EFFORT.get(sid, "medium")
         meta["effort"] = effort
     elif is_new and prompt:
+        # Step A: Prompt Optimization (BEFORE sending to Jev)
+        raw_prompt = prompt
+        opt_text = raw_prompt
+        opt_status = "BYPASS_DISABLED"
+        opt_latency = 0.0
+        diff_summary = ""
+        orig_tok = max(1, int(len(raw_prompt) / 3.8))
+        opt_tok = orig_tok
+
+        if OPT_ENABLED:
+            is_eligible, bypass_reason = check_prompt_heuristic(raw_prompt)
+            if is_eligible:
+                opt_result, success, status, latency_ms = run_prompt_optimizer(raw_prompt)
+                opt_status = status
+                opt_latency = latency_ms
+                if success:
+                    opt_text = opt_result
+                    opt_tok = max(1, int(len(opt_text) / 3.8))
+                    diff_data = generate_diff_summary(raw_prompt, opt_text)
+                    diff_summary = diff_data.get("unified_diff", "")
+                    update_last_user_prompt(body, opt_text)
+                    prompt = opt_text  # CRITICAL: send optimized prompt to Planning detection & Jev!
+            else:
+                opt_status = f"BYPASS_{bypass_reason}"
+
+        meta["opt_status"] = opt_status
+        meta["raw_prompt"] = raw_prompt
+        meta["optimized_prompt"] = opt_text
+        meta["opt_latency_ms"] = opt_latency
+        meta["diff_summary"] = diff_summary
+        meta["original_tokens_est"] = orig_tok
+        meta["optimized_tokens_est"] = opt_tok
+
+        # Step B: Jev Classification with the (potentially optimized) prompt
         _hist = build_history(body, prompt)
         _ask = prompt
         if _hist:
@@ -1913,6 +2351,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </html>
 """
 
+DASHBOARD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+
+
+def load_dashboard_content() -> str:
+    if os.path.isfile(DASHBOARD_FILE):
+        try:
+            with open(DASHBOARD_FILE, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            print(f"[DASHBOARD FILE READ ERROR] {e}", flush=True)
+    return DASHBOARD_HTML
+
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -1940,6 +2390,9 @@ class Handler(BaseHTTPRequestHandler):
         elif clean_path == "/api/decisions":
             self._serve_api_decisions()
             return
+        elif clean_path == "/api/diffs":
+            self._serve_api_diffs()
+            return
         elif clean_path == "/api/test-jev":
             self._serve_api_test_jev()
             return
@@ -1956,7 +2409,7 @@ class Handler(BaseHTTPRequestHandler):
         clean_path = self.path.split("?", 1)[0].rstrip("/")
         is_html = "text/html" in self.headers.get("Accept", "")
         if clean_path in ("/dashboard", "/monitor", "/status", "/_jev", "/_jev/status") or (clean_path == "" and is_html):
-            body = DASHBOARD_HTML.encode("utf-8")
+            body = load_dashboard_content().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -1965,7 +2418,7 @@ class Handler(BaseHTTPRequestHandler):
         self._forward("HEAD")
 
     def _serve_dashboard(self) -> None:
-        body = DASHBOARD_HTML.encode("utf-8")
+        body = load_dashboard_content().encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -1990,6 +2443,22 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 limit = 50
         data = query_recent_decisions(limit=limit)
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_api_diffs(self) -> None:
+        limit = 50
+        if "limit=" in self.path:
+            try:
+                limit = int(self.path.split("limit=")[1].split("&")[0])
+            except Exception:
+                limit = 50
+        data = query_recent_diffs(limit=limit)
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -2056,6 +2525,137 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _serve_api_test_optimizer(self) -> None:
+        content_len = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            prompt = payload.get("prompt", "").strip()
+            force = bool(payload.get("force_optimize", False))
+            if not prompt:
+                resp = {"success": False, "error": "Prompt không được để trống"}
+            else:
+                is_eligible, reason = check_prompt_heuristic(prompt)
+                if not is_eligible and not force:
+                    resp = {
+                        "success": True,
+                        "raw_prompt": prompt,
+                        "optimized_prompt": prompt,
+                        "opt_status": f"BYPASS_{reason}",
+                        "opt_latency_ms": 0.0,
+                        "diff_summary": "",
+                        "is_eligible": False,
+                        "bypass_reason": reason,
+                    }
+                else:
+                    opt_res, success, status, lat_ms = run_prompt_optimizer(prompt)
+                    diff_data = generate_diff_summary(prompt, opt_res if success else prompt)
+                    resp = {
+                        "success": success,
+                        "raw_prompt": prompt,
+                        "optimized_prompt": opt_res if success else prompt,
+                        "opt_status": status,
+                        "opt_latency_ms": lat_ms,
+                        "diff_summary": diff_data.get("unified_diff", ""),
+                        "diff_stats": diff_data,
+                        "is_eligible": is_eligible,
+                    }
+        except Exception as e:
+            resp = {"success": False, "error": str(e)}
+
+        body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_api_test_pipeline(self) -> None:
+        content_len = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
+        t_all = time.time()
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            prompt = payload.get("prompt", "").strip()
+            force = bool(payload.get("force_optimize", False))
+            if not prompt:
+                resp = {"success": False, "error": "Prompt không được để trống"}
+            else:
+                raw_prompt = prompt
+                opt_prompt = raw_prompt
+                opt_status = "BYPASS_DISABLED"
+                opt_latency = 0.0
+                diff_summary = ""
+                diff_stats = {}
+                is_eligible, reason = check_prompt_heuristic(raw_prompt)
+
+                if OPT_ENABLED and (is_eligible or force):
+                    opt_res, success, status, lat_ms = run_prompt_optimizer(raw_prompt)
+                    opt_status = status
+                    opt_latency = lat_ms
+                    if success:
+                        opt_prompt = opt_res
+                        diff_data = generate_diff_summary(raw_prompt, opt_prompt)
+                        diff_summary = diff_data.get("unified_diff", "")
+                        diff_stats = diff_data
+                elif not is_eligible:
+                    opt_status = f"BYPASS_{reason}"
+
+                prompt_to_classify = opt_prompt
+                is_planning = bool(PLANNING_RX.search(prompt_to_classify))
+                is_heavy_arch = bool(ARCH_RX.search(prompt_to_classify)) if is_planning else False
+
+                extra = ""
+                if is_planning:
+                    extra = " NOTE: The user is in PLANNING / DESIGN mode (e.g. Superpowers plan or implementation spec). Select sol or astra, with reasoning_effort high."
+
+                t_jev = time.time()
+                tier, conf, effort, e_conf = ask_jev(prompt_to_classify, extra)
+                jev_latency = round((time.time() - t_jev) * 1000, 1)
+
+                if is_planning:
+                    if tier in ("luna", "terra"):
+                        tier = "sol"
+                        conf = max(conf, 0.95)
+                    if is_heavy_arch and tier != "astra":
+                        tier = "astra"
+                        conf = max(conf, 0.95)
+                    effort = "high"
+                    e_conf = max(e_conf, 0.95)
+
+                total_latency = round((time.time() - t_all) * 1000, 1)
+                selected_model = MAP.get(tier, DEFAULT_MODEL)
+
+                resp = {
+                    "success": True,
+                    "raw_prompt": raw_prompt,
+                    "optimized_prompt": opt_prompt,
+                    "opt_status": opt_status,
+                    "opt_latency_ms": opt_latency,
+                    "diff_summary": diff_summary,
+                    "diff_stats": diff_stats,
+                    "jev_latency_ms": jev_latency,
+                    "total_latency_ms": total_latency,
+                    "is_planning": is_planning,
+                    "is_heavy_arch": is_heavy_arch,
+                    "tier": tier,
+                    "confidence": conf,
+                    "reasoning_effort": effort,
+                    "reasoning_conf": e_conf,
+                    "selected_model": selected_model,
+                }
+        except Exception as e:
+            resp = {"success": False, "error": str(e), "total_latency_ms": round((time.time() - t_all) * 1000, 1)}
+
+        body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _serve_api_get_settings(self) -> None:
         data = get_current_settings()
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -2099,6 +2699,12 @@ class Handler(BaseHTTPRequestHandler):
         if clean_path == "/api/settings":
             self._serve_api_save_settings()
             return
+        elif clean_path == "/api/test-pipeline":
+            self._serve_api_test_pipeline()
+            return
+        elif clean_path == "/api/test-optimizer":
+            self._serve_api_test_optimizer()
+            return
         self._forward("POST")
 
     def do_PUT(self) -> None:
@@ -2128,7 +2734,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path if self.path.startswith("/") else "/" + self.path
         url = UPSTREAM_ORIGIN + path
 
-        if method == "POST" and "/responses" in path.split("?", 1)[0]:
+        if method == "POST" and ("/responses" in path.split("?", 1)[0] or "/chat/completions" in path.split("?", 1)[0]):
             if DEBUG_DUMPS:
                 try:
                     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "req-headers.jsonl"), "a") as _f:
@@ -2181,6 +2787,9 @@ class Handler(BaseHTTPRequestHandler):
                 "out": meta.get("out"),
                 "session_id": meta.get("sid"),
             }
+            if meta.get("opt_status"):
+                slim["opt_status"] = meta["opt_status"]
+                slim["opt_latency_ms"] = meta.get("opt_latency_ms")
             if meta.get("hist") is not None:
                 slim["hist"] = meta["hist"]
             if meta.get("probs"):
@@ -2202,6 +2811,8 @@ class Handler(BaseHTTPRequestHandler):
 
             # Output to stdout/journalctl
             if meta.get("new"):
+                if meta.get("opt_status") == "OPTIMIZED":
+                    print(f"[PROMPT OPTIMIZER] Optimized in {meta.get('opt_latency_ms')}ms: {meta.get('raw_prompt')[:40]!r} -> {meta.get('optimized_prompt')[:40]!r}", flush=True)
                 print(f"[JEV ROUTE] Turn: {meta.get('prompt')[:60]!r} -> Tier: {meta.get('tier')} ({int(meta.get('conf', 0)*100)}%) | Reasoning: {meta.get('effort')} ({int(meta.get('effort_conf', 0)*100)}%) -> Model: {meta.get('out')} (in: {meta.get('in')})", flush=True)
             elif meta.get("esc_from"):
                 print(f"[JEV ESCALATE] Upgraded {meta.get('esc_from')} -> {meta.get('out')} (Tier: {meta.get('tier')}, Effort: {meta.get('effort')}) due to tool failure", flush=True)
@@ -2211,6 +2822,8 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"[JEV REWRITE] Path: {path} -> Model: {meta.get('out')} (Effort: {meta.get('effort')})", flush=True)
 
         headers = copy_req_headers(self)
+        if UPSTREAM_KEY and not headers.get("Authorization"):
+            headers["Authorization"] = f"Bearer {UPSTREAM_KEY}"
         if raw:
             headers["Content-Length"] = str(len(raw))
         elif "Content-Length" in headers:

@@ -2912,11 +2912,12 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             self.send_header(k, v)
         self.send_header("Connection", "close")
+        self.send_header("X-Accel-Buffering", "no")
         self.close_connection = True
         self.end_headers()
         try:
             while True:
-                chunk = up.read(4096)
+                chunk = up.read1(4096) if hasattr(up, "read1") else up.read(4096)
                 if not chunk:
                     break
                 self.wfile.write(chunk)

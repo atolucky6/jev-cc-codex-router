@@ -2389,6 +2389,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         clean_path = self.path.split("?", 1)[0].rstrip("/")
+        if clean_path in ("/jev", "/jev/dashboard"):
+            clean_path = "/dashboard"
+        elif clean_path.startswith("/jev/"):
+            clean_path = clean_path[4:]
         is_html = "text/html" in self.headers.get("Accept", "")
 
         if clean_path in ("/dashboard", "/monitor", "/status", "/_jev", "/_jev/status"):
@@ -2423,6 +2427,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self) -> None:
         clean_path = self.path.split("?", 1)[0].rstrip("/")
+        if clean_path in ("/jev", "/jev/dashboard"):
+            clean_path = "/dashboard"
+        elif clean_path.startswith("/jev/"):
+            clean_path = clean_path[4:]
         is_html = "text/html" in self.headers.get("Accept", "")
         if clean_path in ("/dashboard", "/monitor", "/status", "/_jev", "/_jev/status") or (clean_path == "" and is_html):
             body = load_dashboard_content().encode("utf-8")
@@ -2712,6 +2720,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         clean_path = self.path.split("?", 1)[0].rstrip("/")
+        if clean_path.startswith("/jev/"):
+            clean_path = clean_path[4:]
         if clean_path == "/api/settings":
             self._serve_api_save_settings()
             return
@@ -2734,6 +2744,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:
         clean_path = self.path.split("?", 1)[0].rstrip("/")
+        if clean_path.startswith("/jev/"):
+            clean_path = clean_path[4:]
         if clean_path.startswith("/api/"):
             self.send_response(200)
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -2748,6 +2760,8 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0) or 0)
         raw = self.rfile.read(length) if length else b""
         path = self.path if self.path.startswith("/") else "/" + self.path
+        if path.startswith("/jev/"):
+            path = path[4:]
         url = UPSTREAM_ORIGIN + path
 
         if method == "POST" and ("/responses" in path.split("?", 1)[0] or "/chat/completions" in path.split("?", 1)[0]):
@@ -2829,7 +2843,9 @@ class Handler(BaseHTTPRequestHandler):
             if meta.get("new"):
                 if meta.get("opt_status") == "OPTIMIZED":
                     print(f"[PROMPT OPTIMIZER] Optimized in {meta.get('opt_latency_ms')}ms: {meta.get('raw_prompt')[:40]!r} -> {meta.get('optimized_prompt')[:40]!r}", flush=True)
-                print(f"[JEV ROUTE] Turn: {meta.get('prompt')[:60]!r} -> Tier: {meta.get('tier')} ({int(meta.get('conf', 0)*100)}%) | Reasoning: {meta.get('effort')} ({int(meta.get('effort_conf', 0)*100)}%) -> Model: {meta.get('out')} (in: {meta.get('in')})", flush=True)
+                _c_conf = float(meta.get("conf") or 0.0)
+                _e_conf = float(meta.get("effort_conf") or 0.0)
+                print(f"[JEV ROUTE] Turn: {str(meta.get('prompt') or '')[:60]!r} -> Tier: {meta.get('tier')} ({int(_c_conf*100)}%) | Reasoning: {meta.get('effort')} ({int(_e_conf*100)}%) -> Model: {meta.get('out')} (in: {meta.get('in')})", flush=True)
             elif meta.get("esc_from"):
                 print(f"[JEV ESCALATE] Upgraded {meta.get('esc_from')} -> {meta.get('out')} (Tier: {meta.get('tier')}, Effort: {meta.get('effort')}) due to tool failure", flush=True)
             elif meta.get("tier") == "reuse":
@@ -2896,11 +2912,12 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             self.send_header(k, v)
         self.send_header("Connection", "close")
+        self.send_header("X-Accel-Buffering", "no")
         self.close_connection = True
         self.end_headers()
         try:
             while True:
-                chunk = up.read(4096)
+                chunk = up.read1(4096) if hasattr(up, "read1") else up.read(4096)
                 if not chunk:
                     break
                 self.wfile.write(chunk)

@@ -85,8 +85,7 @@
   "optimizer": {
     "enabled": true,
     "url": "http://127.0.0.1:8317/v1/chat/completions",
-    "model": "gemini-3.8-flash-high",
-    "api_key": "sk-4a7dc2e928a61731-87c6c6-e2d7ca9c",
+    "model": "gemini-3.5-flash-lite",
     "api_key_masked": "sk-4a7d...ca9c",
     "timeout_seconds": 15.0,
     "temperature": 0.3,

@@ -5,7 +5,7 @@ Sits between Codex and any OpenAI-Responses-compatible upstream. On each new use
 turn it asks Jev (TypeSafe System One / OpenRouter) which model tier and reasoning level
 the task needs, rewrites the request's `model` and `reasoning` fields, and reuses that
 choice for the rest of the turn.
-Also retries flaky upstream 400/502/503/504 on POST /responses.
+Also retries transient upstream 502/503/504 on POST /responses.
 Logs decisions to SQLite database (decisions.db) and provides a web dashboard.
 Configuration: environment variables, see .env.example and README.md.
 """
@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sqlite3
+import io
 import threading
 import time
 import urllib.error
@@ -1022,6 +1023,11 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
     global OPT_SYSTEM_PROMPT, OPT_MIN_CHARS, OPT_MIN_WORDS, OPT_PRESERVE_VARS, OPT_SKIP_SHORT, OPT_LOOP_MARKERS
     try:
         models = data.get("models") or {}
+        if not isinstance(models, dict):
+            return False, "models must be an object"
+        for name in ("luna", "terra", "sol", "astra", "fallback"):
+            if name in models and (not isinstance(models[name], str) or not models[name].strip()):
+                return False, f"models.{name} must be a non-empty string"
         if models.get("luna"):
             MAP["luna"] = models["luna"].strip()
         if models.get("terra"):
@@ -1387,7 +1393,7 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
         meta["effort_conf"] = effort_conf
         meta["probs"] = dict(LAST_PROBS.get("v") or {})
         meta["effort_probs"] = dict(LAST_PROBS.get("effort") or {})
-        chosen = MAP.get(tier, incoming) or incoming or DEFAULT_MODEL
+        chosen = DEFAULT_MODEL if meta.get("err") else (MAP.get(tier, incoming) or incoming or DEFAULT_MODEL)
         LEASE[sid] = chosen
         LEASE_EFFORT[sid] = effort
     else:
@@ -1457,13 +1463,74 @@ def copy_req_headers(handler: BaseHTTPRequestHandler) -> dict[str, str]:
     return out
 
 
-RETRY_CODES = {400, 502, 503, 504}
+RETRY_CODES = {502, 503, 504}
 RETRY_MAX = int(_env("JEV_RETRY_MAX", "2"))
 RETRY_DELAY = float(_env("JEV_RETRY_DELAY", "1.0"))
 
 
+def route_unavailable(error) -> bool:
+    """Recognize route failures while preserving the complete upstream error body."""
+    body = error.read()
+    error.fp = io.BytesIO(body)
+    error.file = error.fp
+    error.read = error.fp.read
+    try:
+        detail = json.loads(body).get("error", {})
+        if not isinstance(detail, dict):
+            return False
+        code = str(detail.get("code", "")).lower()
+        message = str(detail.get("message", "")).lower()
+        return (
+            error.code in (400, 404) and code == "model_not_found"
+        ) or (
+            error.code == 503 and (code == "auth_unavailable" or "auth_unavailable:" in message)
+        )
+    except (ValueError, AttributeError):
+        return False
+
+
+def fallback_request(req, method: str, path: str, meta: dict):
+    """Fallback only for a routed new turn without provider-specific continuation state."""
+    if (method != "POST" or path.split("?", 1)[0] not in ("/responses", "/v1/responses")
+            or not REWRITE or not meta.get("new") or not meta.get("tier")
+            or meta.get("tier") == "reuse" or req.get_header("Content-encoding")
+            or not DEFAULT_MODEL.strip() or meta.get("out") == DEFAULT_MODEL):
+        return None
+    try:
+        body = json.loads(req.data)
+        if (not isinstance(body, dict) or body.get("model") != meta.get("out")
+                or body.get("previous_response_id") or body.get("conversation")):
+            return None
+        items = body.get("input", [])
+        if isinstance(items, list) and any(
+            isinstance(item, dict) and (item.get("type") in TOOL_TYPES or item.get("role") == "tool")
+            for item in items
+        ):
+            return None
+        body["model"] = DEFAULT_MODEL
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        headers = {k: v for k, v in req.header_items() if k.lower() != "content-length"}
+        return urllib.request.Request(req.full_url, data=data, headers=headers, method=method)
+    except (ValueError, TypeError):
+        return None
+
+
+def open_routed_request(req, method: str, path: str, meta: dict):
+    try:
+        return open_with_retry(req, method, path), None
+    except urllib.error.HTTPError as error:
+        replacement = fallback_request(req, method, path, meta) if route_unavailable(error) else None
+        if replacement is None:
+            raise
+        error.close()
+        print(f"[JEV FALLBACK] {meta.get('out')} -> {DEFAULT_MODEL} status={error.code}", flush=True)
+        # One model switch; transient errors on the fallback use bounded retries.
+        up = open_with_retry(replacement, method, path)
+        return up, json.loads(replacement.data)["model"]
+
+
 def open_with_retry(req, method: str, path: str):
-    """Retry flaky upstream 400/502/503/504 on POST /responses; re-raise the last failure."""
+    """Retry transient upstream failures; never retry invalid models or unavailable auth."""
     retry_ok = method == "POST" and "/responses" in path.split("?", 1)[0]
     attempt = 0
     while True:
@@ -1473,21 +1540,19 @@ def open_with_retry(req, method: str, path: str):
                 print(f"RETRY OK after {attempt} retry {method} {path}", flush=True)
             return up
         except urllib.error.HTTPError as e:
-            if retry_ok and e.code in RETRY_CODES and attempt < RETRY_MAX:
-                try:
-                    body = e.read()[:200]
-                except Exception:
-                    body = b""
+            unavailable = route_unavailable(e)
+            if retry_ok and e.code in RETRY_CODES and not unavailable and attempt < RETRY_MAX:
                 attempt += 1
-                print(f"RETRY {attempt}/{RETRY_MAX} upstream HTTP {e.code} {path} {body}", flush=True)
-                time.sleep(RETRY_DELAY)
+                print(f"RETRY {attempt}/{RETRY_MAX} upstream HTTP {e.code} {path}", flush=True)
+                e.close()
+                time.sleep(min(RETRY_DELAY * (2 ** (attempt - 1)), 10.0))
                 continue
             raise
         except urllib.error.URLError as e:
             if retry_ok and attempt < RETRY_MAX:
                 attempt += 1
                 print(f"RETRY {attempt}/{RETRY_MAX} forward error {e} {path}", flush=True)
-                time.sleep(RETRY_DELAY)
+                time.sleep(min(RETRY_DELAY * (2 ** (attempt - 1)), 10.0))
                 continue
             raise
 
@@ -2757,6 +2822,7 @@ class Handler(BaseHTTPRequestHandler):
         self._forward("OPTIONS")
 
     def _forward(self, method: str) -> None:
+        meta = {}
         length = int(self.headers.get("Content-Length", 0) or 0)
         raw = self.rfile.read(length) if length else b""
         path = self.path if self.path.startswith("/") else "/" + self.path
@@ -2865,7 +2931,11 @@ class Handler(BaseHTTPRequestHandler):
             url, data=raw or None, headers=headers, method=method
         )
         try:
-            up = open_with_retry(req, method, path)
+            up, fallback_model = open_routed_request(req, method, path, meta)
+            if fallback_model:
+                LEASE[meta["sid"]] = fallback_model
+                meta["out"] = fallback_model
+                print(f"[JEV FALLBACK OK] model={fallback_model} status={up.status}", flush=True)
         except urllib.error.HTTPError as e:
             err_body = e.read() or str(e).encode()
             self.send_response(e.code)

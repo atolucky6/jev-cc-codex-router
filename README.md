@@ -20,7 +20,9 @@ It sits between Codex and any OpenAI **Responses API**-compatible upstream (a lo
 
 ## Extra behavior
 
-- For `POST /responses`, retries up to 2 times on upstream 400/502/503/504 or a connection error, waiting 1 second. This masks flaky upstreams. It cannot recover a stream that is cut after a 200 response.
+- For `POST /responses`, retries up to 2 times on transient upstream 502/503/504 or a connection error, using exponential delays starting at 1 second (capped at 10 seconds). Invalid requests and `auth_unavailable` are not retried. It cannot recover a stream cut after a 200 response.
+- On `model_not_found` (400/404) or `auth_unavailable` (503), a routed new Responses turn can try the configured fallback model. Successful fallback updates the session lease. Passthrough requests, continuation turns, compressed requests, provider conversation state and tool-call histories are excluded. Fallback does not recurse; transient errors on the fallback still use the normal bounded retry policy.
+- Classification failures use the configured fallback model. Settings reject blank or non-string model mappings.
 - Handles `Content-Encoding: zstd` request bodies (decompress, rewrite, recompress). Python 3.14+ uses the standard library; older Python needs `pip install zstandard`.
 - **Debug output is off by default.** Set `JEV_DEBUG=1` to write `decisions.jsonl` (tier, probabilities, in/out model per request), `req-headers.jsonl` (request headers) and `errors-400/` (full failing 400 requests). These files contain prompt excerpts, so keep them private. They are git-ignored. With debug off, the proxy writes no files.
 

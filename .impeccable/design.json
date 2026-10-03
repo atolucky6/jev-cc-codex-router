@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-03T08:42:54.389947+00:00",
+  "title": "Design System: Jev Router",
+  "extensions": {
+    "colorMeta": {
+      "bg-primary": {
+        "role": "neutral",
+        "displayName": "Bg Primary",
+        "tonalRamp": [
+          "oklch(15% 0.00252 228.78)",
+          "oklch(27% 0.00252 228.78)",
+          "oklch(39% 0.00252 228.78)",
+          "oklch(51% 0.00252 228.78)",
+          "oklch(63% 0.00252 228.78)",
+          "oklch(75% 0.00252 228.78)",
+          "oklch(87% 0.00252 228.78)",
+          "oklch(95% 0.00252 228.78)"
+        ]
+      },
+      "bg-secondary": {
+        "role": "neutral",
+        "displayName": "Bg Secondary",
+        "tonalRamp": [
+          "oklch(15% 0.00000 89.88)",
+          "oklch(27% 0.00000 89.88)",
+          "oklch(39% 0.00000 89.88)",
+          "oklch(51% 0.00000 89.88)",
+          "oklch(63% 0.00000 89.88)",
+          "oklch(75% 0.00000 89.88)",
+          "oklch(87% 0.00000 89.88)",
+          "oklch(95% 0.00000 89.88)"
+        ]
+      },
+      "bg-card": {
+        "role": "neutral",
+        "displayName": "Bg Card",
+        "tonalRamp": [
+          "oklch(15% 0.00449 214.33)",
+          "oklch(27% 0.00449 214.33)",
+          "oklch(39% 0.00449 214.33)",
+          "oklch(51% 0.00449 214.33)",
+          "oklch(63% 0.00449 214.33)",
+          "oklch(75% 0.00449 214.33)",
+          "oklch(87% 0.00449 214.33)",
+          "oklch(95% 0.00449 214.33)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.00860 225.09)",
+          "oklch(27% 0.00860 225.09)",
+          "oklch(39% 0.00860 225.09)",
+          "oklch(51% 0.00860 225.09)",
+          "oklch(63% 0.00860 225.09)",
+          "oklch(75% 0.00860 225.09)",
+          "oklch(87% 0.00860 225.09)",
+          "oklch(95% 0.00860 225.09)"
+        ]
+      },
+      "text-main": {
+        "role": "neutral",
+        "displayName": "Text Main",
+        "tonalRamp": [
+          "oklch(15% 0.02678 233.48)",
+          "oklch(27% 0.02678 233.48)",
+          "oklch(39% 0.02678 233.48)",
+          "oklch(51% 0.02678 233.48)",
+          "oklch(63% 0.02678 233.48)",
+          "oklch(75% 0.02678 233.48)",
+          "oklch(87% 0.02678 233.48)",
+          "oklch(95% 0.02678 233.48)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Text Muted",
+        "tonalRamp": [
+          "oklch(15% 0.02695 228.20)",
+          "oklch(27% 0.02695 228.20)",
+          "oklch(39% 0.02695 228.20)",
+          "oklch(51% 0.02695 228.20)",
+          "oklch(63% 0.02695 228.20)",
+          "oklch(75% 0.02695 228.20)",
+          "oklch(87% 0.02695 228.20)",
+          "oklch(95% 0.02695 228.20)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15% 0.08746 183.28)",
+          "oklch(27% 0.08746 183.28)",
+          "oklch(39% 0.08746 183.28)",
+          "oklch(51% 0.08746 183.28)",
+          "oklch(63% 0.08746 183.28)",
+          "oklch(75% 0.08746 183.28)",
+          "oklch(87% 0.08746 183.28)",
+          "oklch(95% 0.08746 183.28)"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Accent Soft",
+        "tonalRamp": [
+          "oklch(15% 0.01670 178.27)",
+          "oklch(27% 0.01670 178.27)",
+          "oklch(39% 0.01670 178.27)",
+          "oklch(51% 0.01670 178.27)",
+          "oklch(63% 0.01670 178.27)",
+          "oklch(75% 0.01670 178.27)",
+          "oklch(87% 0.01670 178.27)",
+          "oklch(95% 0.01670 178.27)"
+        ]
+      },
+      "accent-purple": {
+        "role": "secondary",
+        "displayName": "Accent Purple",
+        "tonalRamp": [
+          "oklch(15% 0.12378 289.86)",
+          "oklch(27% 0.12378 289.86)",
+          "oklch(39% 0.12378 289.86)",
+          "oklch(51% 0.12378 289.86)",
+          "oklch(63% 0.12378 289.86)",
+          "oklch(75% 0.12378 289.86)",
+          "oklch(87% 0.12378 289.86)",
+          "oklch(95% 0.12378 289.86)"
+        ]
+      },
+      "luna": {
+        "role": "secondary",
+        "displayName": "Luna",
+        "tonalRamp": [
+          "oklch(15% 0.09223 183.04)",
+          "oklch(27% 0.09223 183.04)",
+          "oklch(39% 0.09223 183.04)",
+          "oklch(51% 0.09223 183.04)",
+          "oklch(63% 0.09223 183.04)",
+          "oklch(75% 0.09223 183.04)",
+          "oklch(87% 0.09223 183.04)",
+          "oklch(95% 0.09223 183.04)"
+        ]
+      },
+      "terra": {
+        "role": "secondary",
+        "displayName": "Terra",
+        "tonalRamp": [
+          "oklch(15% 0.11593 251.33)",
+          "oklch(27% 0.11593 251.33)",
+          "oklch(39% 0.11593 251.33)",
+          "oklch(51% 0.11593 251.33)",
+          "oklch(63% 0.11593 251.33)",
+          "oklch(75% 0.11593 251.33)",
+          "oklch(87% 0.11593 251.33)",
+          "oklch(95% 0.11593 251.33)"
+        ]
+      },
+      "sol": {
+        "role": "secondary",
+        "displayName": "Sol",
+        "tonalRamp": [
+          "oklch(15% 0.08346 86.98)",
+          "oklch(27% 0.08346 86.98)",
+          "oklch(39% 0.08346 86.98)",
+          "oklch(51% 0.08346 86.98)",
+          "oklch(63% 0.08346 86.98)",
+          "oklch(75% 0.08346 86.98)",
+          "oklch(87% 0.08346 86.98)",
+          "oklch(95% 0.08346 86.98)"
+        ]
+      },
+      "astra": {
+        "role": "secondary",
+        "displayName": "Astra",
+        "tonalRamp": [
+          "oklch(15% 0.11974 308.42)",
+          "oklch(27% 0.11974 308.42)",
+          "oklch(39% 0.11974 308.42)",
+          "oklch(51% 0.11974 308.42)",
+          "oklch(63% 0.11974 308.42)",
+          "oklch(75% 0.11974 308.42)",
+          "oklch(87% 0.11974 308.42)",
+          "oklch(95% 0.11974 308.42)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger",
+        "tonalRamp": [
+          "oklch(15% 0.16366 24.76)",
+          "oklch(27% 0.16366 24.76)",
+          "oklch(39% 0.16366 24.76)",
+          "oklch(51% 0.16366 24.76)",
+          "oklch(63% 0.16366 24.76)",
+          "oklch(75% 0.16366 24.76)",
+          "oklch(87% 0.16366 24.76)",
+          "oklch(95% 0.16366 24.76)"
+        ]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar",
+        "tonalRamp": [
+          "oklch(15% 0.02416 228.75)",
+          "oklch(27% 0.02416 228.75)",
+          "oklch(39% 0.02416 228.75)",
+          "oklch(51% 0.02416 228.75)",
+          "oklch(63% 0.02416 228.75)",
+          "oklch(75% 0.02416 228.75)",
+          "oklch(87% 0.02416 228.75)",
+          "oklch(95% 0.02416 228.75)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Functional page title, not a display face."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel and settings headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "General interface text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels and controls."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Model identifiers and technical values."
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "Tabular summary measurements."
+      }
+    },
+    "shadows": [
+      {
+        "name": "modal",
+        "value": "0 18px 60px #00000030",
+        "purpose": "Prompt comparison modal only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "background 160ms, border-color 160ms",
+        "purpose": "Button hover colors."
+      },
+      {
+        "name": "distribution",
+        "value": "transform 200ms ease-out",
+        "purpose": "Tier usage fill."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none !important; animation: none !important",
+        "purpose": "Honor prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1500px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1180px"
+      },
+      {
+        "name": "stacked-workspace",
+        "value": "980px"
+      },
+      {
+        "name": "mobile",
+        "value": "700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Deliberate routing or settings action.",
+      "html": "<button class=\"ds-btn ds-primary\">Save settings</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid #cdd8dc; border-radius:7px; padding:9px 13px; min-height:38px; font:600 12px/1.5 \"Segoe UI\",sans-serif; cursor:pointer; transition:background 160ms,border-color 160ms; } .ds-btn:disabled { opacity:.5; cursor:wait; } .ds-btn:focus-visible { outline:3px solid #218e80; outline-offset:3px; }.ds-primary { background:var(--accent,#067368); border-color:var(--accent,#067368); color:white; } .ds-primary:hover { background:#05675d; border-color:#05675d; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral refresh and inspection action.",
+      "html": "<button class=\"ds-btn ds-secondary\">Refresh</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid #cdd8dc; border-radius:7px; padding:9px 13px; min-height:38px; font:600 12px/1.5 \"Segoe UI\",sans-serif; cursor:pointer; transition:background 160ms,border-color 160ms; } .ds-btn:disabled { opacity:.5; cursor:wait; } .ds-btn:focus-visible { outline:3px solid #218e80; outline-offset:3px; }.ds-secondary { background:white; color:#344c57; } .ds-secondary:hover { background:#edf3f3; border-color:#92aaa9; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Low-emphasis contextual action.",
+      "html": "<button class=\"ds-btn ds-quiet\">Configure models</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid #cdd8dc; border-radius:7px; padding:9px 13px; min-height:38px; font:600 12px/1.5 \"Segoe UI\",sans-serif; cursor:pointer; transition:background 160ms,border-color 160ms; } .ds-btn:disabled { opacity:.5; cursor:wait; } .ds-btn:focus-visible { outline:3px solid #218e80; outline-offset:3px; }.ds-quiet { background:transparent; border-color:transparent; color:var(--text-muted,#566972); min-height:30px; padding:5px 9px; } .ds-quiet:hover { background:#edf3f3; border-color:#92aaa9; }"
+    },
+    {
+      "name": "Technical Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Editable model identifier with a visible label.",
+      "html": "<label class=\"ds-label\" for=\"ds-model\">Luna</label><input class=\"ds-input\" id=\"ds-model\" value=\"gpt-6-luna\">",
+      "css": ".ds-label { display:block; margin-bottom:7px; color:var(--text-main,#203039); font:600 12px/1.5 \"Segoe UI\",sans-serif; } .ds-input { width:100%; min-width:0; padding:9px 11px; border:1px solid #ccd7dc; border-radius:6px; background:#fbfcfc; color:var(--text-main,#203039); caret-color:var(--accent,#067368); font:12px/1.5 Consolas,monospace; } .ds-input:focus-visible { outline:3px solid #218e80; outline-offset:3px; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Dark navigation with a selected workspace.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Workspaces\"><button class=\"ds-tab ds-selected\" aria-current=\"page\">Overview</button><button class=\"ds-tab\">Prompt audit</button></nav>",
+      "css": ".ds-nav { background:var(--sidebar,#18272e); padding:16px; display:flex; flex-direction:column; gap:5px; } .ds-tab { display:flex; align-items:center; gap:11px; min-height:44px; padding:11px 12px; border:0; border-radius:7px; background:transparent; color:#c0ced3; text-align:left; font:13px/1.5 \"Segoe UI\",sans-serif; cursor:pointer; } .ds-tab:hover { background:#253b44; color:white; } .ds-tab.ds-selected { background:#29473f; color:#c6f2df; } .ds-selected::after { content:\"\"; width:5px; height:5px; background:#a9e7ce; border-radius:50%; margin-left:auto; } .ds-tab:focus-visible { outline:3px solid #218e80; outline-offset:3px; }"
+    },
+    {
+      "name": "Tier Chips",
+      "kind": "chip",
+      "refersTo": "tier-chip",
+      "description": "Named semantic tiers; color remains paired with text.",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-chip ds-luna\">Luna</span><span class=\"ds-chip ds-terra\">Terra</span><span class=\"ds-chip ds-sol\">Sol</span><span class=\"ds-chip ds-astra\">Astra</span></div>",
+      "css": ".ds-chips { display:flex; flex-wrap:wrap; gap:7px; } .ds-chip { display:inline-block; padding:3px 7px; border-radius:4px; font:600 12px/1.5 \"Segoe UI\",sans-serif; white-space:nowrap; } .ds-luna { color:#087363; background:#e4f2ec; } .ds-terra { color:#275b91; background:#e8f0f9; } .ds-sol { color:#806017; background:#faf1d9; } .ds-astra { color:#765099; background:#f0eaf6; }"
+    },
+    {
+      "name": "Inspection Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat, bordered information surface.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel-title\">Connections</h2><p class=\"ds-panel-copy\">Inspect upstream and routing configuration.</p></section>",
+      "css": ".ds-panel { background:var(--bg-secondary,#ffffff); border:1px solid var(--border,#dce3e6); border-radius:var(--radius,12px); padding:22px; color:var(--text-main,#203039); } .ds-panel-title { margin:0; font:650 16px/1.5 \"Segoe UI\",sans-serif; letter-spacing:-.015em; } .ds-panel-copy { margin:7px 0 0; color:var(--text-muted,#566972); font:12px/1.5 \"Segoe UI\",sans-serif; }"
+    },
+    {
+      "name": "Request Ledger",
+      "kind": "custom",
+      "refersTo": "request-ledger",
+      "description": "Ruled record with a selectable request title.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-row\"><button class=\"ds-request\"><strong>Inspect routing decision</strong><small>Recorded request</small></button><span class=\"ds-model\">gpt-6-luna</span></div></div>",
+      "css": ".ds-ledger { background:var(--bg-secondary,#ffffff); border:1px solid var(--border,#dce3e6); border-radius:var(--radius,12px); overflow:hidden; } .ds-row { display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; padding:14px 22px; border-bottom:1px solid #edf1f2; } .ds-row:hover { background:#f7faf9; } .ds-request { display:block; border:0; padding:0; background:none; text-align:left; color:var(--text-main,#203039); font:12px/1.5 \"Segoe UI\",sans-serif; cursor:pointer; } .ds-request strong { font-weight:500; } .ds-request small { display:block; margin-top:4px; color:var(--text-muted,#566972); font-size:12px; } .ds-request:hover strong { color:var(--accent,#067368); text-decoration:underline; text-underline-offset:3px; } .ds-request:focus-visible { outline:3px solid #218e80; outline-offset:3px; } .ds-model { font:12px/1.5 Consolas,monospace; color:var(--text-main,#203039); } @media(max-width:700px) { .ds-row { padding:16px 18px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; } .ds-request { grid-column:1/-1; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Debugger Inspection Bench",
+    "overview": "A cool, light work surface sits beside dark ink navigation. Compact system typography, monospaced identifiers, and ruled records make routing decisions easy to inspect. Teal identifies deliberate actions and selection; tier colors retain their semantic roles.\n\nThe system serves a local developer tool: readable evidence, explicit connection states, and practical controls take precedence over decoration. The implementation is standalone HTML with inline CSS and SVG; it ships no raster assets.",
+    "keyCharacteristics": [
+      "Dark navigation beside a cool light workspace.",
+      "Ruled data surfaces and restrained panel borders.",
+      "Teal actions and four named semantic tiers.",
+      "System sans text with monospaced technical values."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Tier Rule",
+        "body": "Keep Luna teal, Terra blue, Sol ochre, and Astra violet consistent across tier marks, distributions, and badges; retain text labels alongside color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Technical Value Rule",
+        "body": "Reserve monospace for technical values and retain tabular numerals for measurements.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Work Surface Rule",
+        "body": "Keep ordinary panels flat; reserve lifted depth for the modal.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve readable labels alongside status and tier colors.",
+      "Do use ruled rows and flat bordered panels for inspectable data.",
+      "Do retain visible keyboard focus and reduced-motion behavior.",
+      "Do stack request rows and forms at the mobile breakpoint."
+    ],
+    "donts": [
+      "Don't add ornamental raster imagery to the inspection workspace.",
+      "Don't apply modal shadows to ordinary panels.",
+      "Don't use technical monospace for ordinary headings and navigation."
+    ]
+  }
+}

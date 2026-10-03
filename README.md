@@ -45,6 +45,17 @@ Adjust the provider fields (auth, `requires_openai_auth`, etc.) to match how you
 
 To roll back, point `model_provider` back to your original provider. The proxy holds no persistent state.
 
+## Dashboard
+
+Open `http://127.0.0.1:8787/dashboard` while the router is running.
+
+- **Overview:** inspect the latest 50 routing records, search or filter by tier, and select a request to see its optimization status, routing decision, model, and reasoning effort. Live activity refreshes every three seconds and can be paused. Model distribution uses all routing records, including continuations.
+- **Prompt audit:** compare original and optimized prompts, with unified diff and side-by-side views.
+- **Playground:** test optimization, routing, or the full pipeline against your configured services.
+- **Settings:** configure tier mappings, connections, routing rules, and optimizer options, then save to apply changes.
+
+The dashboard adapts to mobile screens and reports connection failures while retaining the last successful activity update.
+
 ## Configuration
 
 All settings are environment variables (or lines in `.env`). See `.env.example` for the full list: listen address, upstream, Jev API URL, model name for each tier, fallback model, retry count and delay, log path, and `JEV_REWRITE=0` to turn routing off and only proxy and retry.

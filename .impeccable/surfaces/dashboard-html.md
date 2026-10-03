@@ -13,12 +13,12 @@ Mode: Operate. Scope: standalone dashboard and its four existing workspaces.
 
 THESIS: Make routing inspectable through a request ledger and selected-request journey, rather than a wall of equally weighted metrics.
 
-OWN-WORLD: A software debugger's inspection bench: pale cool work surface, dark ink navigation, teal selection, ruled activity rows, quiet system typography, monospaced model identifiers.
+OWN-WORLD: Apply the user's DESIGN.md to the routing workspace: black-and-white surfaces, Sunlight Yellow reserved for primary actions, square panels, 2px buttons, and Manrope as the guide's permitted NouvelR substitute. Semantic colors identify actual errors, confirmations, and diff changes only.
 
 STORY: See whether data is current, inspect a request, understand its recorded optimization and routing decision, then test or configure deliberately.
 
-FIRST VIEWPORT: Narrow persistent left navigation, compact title/actions, horizontal request path, activity ledger taking two thirds of the work area, tier distribution in the remaining third, compact telemetry below. Selecting a request updates its path and detail inline. Mobile stacks regions without losing any controls.
+FIRST VIEWPORT: Black persistent left navigation, a bold page title and restrained yellow primary action, an inverted black routing-path band, a white ruled activity ledger beside neutral tier distribution, and compact telemetry. Selecting a request updates its path and detail inline. Mobile stacks regions without losing any controls.
 
-FORM: Debugger inspection bench, grounded candidate 6; seed 23d0b6b0. Other grounded references: CI job ledger, network switch console, code review queue, trace explorer, notebook output, build timeline. Declined split-flap challenger contributes stable columns; consumer application contributes plain action labels; ticket wallet contributes ordered stages; star atlas contributes hierarchy; character catalog contributes named roles; transit map contributes consistent routes. Their ornamental forms lose developer identification and task clarity. Code-led, no image assets. Working selection follows the user's request and unanswered optional clarification; no standing preference recorded.
+FORM: Existing routing workflows and composition, restyled to the user-pinned Renault-derived design system in DESIGN.md. Code-led, no image assets. Prior seed 23d0b6b0 records the original composition only; its teal inspection-world styling is superseded by the user's explicit instruction on 2026-10-04. Marketing photography and vehicle-specific components do not belong to this dashboard.
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+FINISH: Verify desktop and mobile across all four workspaces, preserve keyboard and modal behavior, inspect contrast and geometry, and record the finish review and audit. DESIGN.md remains the user's visual authority; do not replace it with a description of the old dashboard.

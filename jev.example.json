@@ -1,0 +1,50 @@
+{
+  "_comment": "Copy this object into settings.json under pre_optimization, or POST {pre_optimization: <this object>} to /api/settings. _comment fields are ignored. enabled toggles rule evaluation. timeout_ms is a cooperative local evaluation deadline. latency_budget_ms and cost_budget_usd cap estimated optimizer-call latency and total cost; null removes a cap. Tighter request budgets win. Model IDs must exist at optimizer.url.",
+  "enabled": true,
+  "timeout_ms": 50,
+  "latency_budget_ms": 1500,
+  "cost_budget_usd": 0.02,
+  "disabled": {
+    "_comment": "When enabled=false: true requests optimization with this model; false skips. Existing eligibility checks and optimizer.enabled still apply. Budgets always apply.",
+    "should_optimize": true,
+    "selected_model": "gemini-3.8-flash-high"
+  },
+  "fallback": {
+    "_comment": "Evaluation exceptions, deadline expiry, or invalid decisions use this policy. false preserves the original prompt. Invalid configuration itself always skips.",
+    "should_optimize": false,
+    "selected_model": "gemini-3.8-flash-high"
+  },
+  "criteria": {
+    "_comment": "All populated conditions must match. Minimums are inclusive. Complexity counts distinct case-insensitive keyword substring matches. Empty category/tier lists allow all values; nonempty lists require matching request metadata.",
+    "min_chars": 40,
+    "min_tokens": 0,
+    "min_complexity": 0,
+    "categories": [],
+    "user_tiers": []
+  },
+  "complexity_keywords": ["refactor", "database", "concurrency", "architecture"],
+  "models": {
+    "gemini-3.8-flash-high": {
+      "_comment": "Illustrative estimates per optimization call, not provider prices or measurements. Replace with your observed latency and expected total input/output cost.",
+      "estimated_latency_ms": 100,
+      "estimated_cost_usd": 0.001
+    },
+    "gpt-6-sol": {
+      "_comment": "Example coding specialist; must be served by the same configured optimizer endpoint and credentials.",
+      "estimated_latency_ms": 500,
+      "estimated_cost_usd": 0.01
+    }
+  },
+  "routing_rules": [
+    {
+      "_comment": "First matching affordable rule wins. At least two complexity keywords select the coding specialist.",
+      "model": "gpt-6-sol",
+      "when": {"min_complexity": 2}
+    },
+    {
+      "_comment": "Catch-all for eligible prompts; also used if the specialist exceeds a request budget. Remove to skip unmatched prompts.",
+      "model": "gemini-3.8-flash-high",
+      "when": {}
+    }
+  ]
+}

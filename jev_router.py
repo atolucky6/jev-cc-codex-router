@@ -26,6 +26,8 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from jev import JevConfig, JevDecision, JevEvaluator
+
 
 def _load_env_file() -> None:
     """Load key-value pairs from .env next to this script into os.environ if not already set."""
@@ -655,6 +657,7 @@ DEFAULT_OPTIMIZER_SYSTEM_PROMPT = (
 )
 
 OPT_ENABLED = True
+PRE_OPT_CONFIG: dict = {}
 OPT_URL = _env("JEV_OPTIMIZER_URL", "http://127.0.0.1:8317/v1/chat/completions")
 OPT_MODEL = _env("JEV_OPTIMIZER_MODEL", "gemini-3.8-flash-high")
 OPT_KEY = _env("JEV_OPTIMIZER_KEY", "")
@@ -717,7 +720,23 @@ def check_prompt_heuristic(candidate_content: str) -> tuple[bool, str]:
     return True, "HUMAN_INPUT_VERIFIED"
 
 
-def run_prompt_optimizer(original_prompt: str) -> tuple[str, bool, str, float]:
+def preprocess_prompt(original_prompt: str, metadata=None, force: bool = False) -> tuple[str, bool, str, float, JevDecision]:
+    """Apply eligibility checks and Jev before calling the selected optimizer."""
+    if not OPT_ENABLED:
+        decision = JevDecision(False, None, "Optimizer disabled")
+        return original_prompt, False, "BYPASS_DISABLED", 0.0, decision
+    eligible, reason = check_prompt_heuristic(original_prompt)
+    if not eligible and not force:
+        decision = JevDecision(False, None, reason)
+        return original_prompt, False, f"BYPASS_{reason}", 0.0, decision
+    decision = JevEvaluator(PRE_OPT_CONFIG, OPT_MODEL).evaluate(original_prompt, metadata)
+    if not decision.should_optimize:
+        return original_prompt, False, "BYPASS_JEV", 0.0, decision
+    result = run_prompt_optimizer(original_prompt, selected_model=decision.selected_model)
+    return (*result, decision)
+
+
+def run_prompt_optimizer(original_prompt: str, selected_model: str | None = None) -> tuple[str, bool, str, float]:
     """Runs prompt through the optimizer model before Jev classification."""
     if not OPT_ENABLED:
         return original_prompt, False, "OPTIMIZER_DISABLED", 0.0
@@ -736,7 +755,7 @@ def run_prompt_optimizer(original_prompt: str) -> tuple[str, bool, str, float]:
         headers["Authorization"] = f"Bearer {api_key}"
 
     payload = {
-        "model": OPT_MODEL,
+        "model": selected_model or OPT_MODEL,
         "temperature": OPT_TEMPERATURE,
         "max_tokens": OPT_MAX_TOKENS,
         "messages": [
@@ -987,6 +1006,7 @@ def get_current_settings() -> dict:
             "skip_short_confirmations": OPT_SKIP_SHORT,
             "autonomous_loop_markers": OPT_LOOP_MARKERS,
         },
+        "pre_optimization": PRE_OPT_CONFIG,
     }
 
 
@@ -1016,12 +1036,16 @@ def fetch_upstream_models() -> dict:
 
 
 def save_settings_data(data: dict) -> tuple[bool, str]:
+    global PRE_OPT_CONFIG
     global MAP, RANK, DEFAULT_MODEL, UPSTREAM_ORIGIN, UPSTREAM_KEY, JEV_URL, JEV_MODEL, REWRITE
     global PLANNING_BOOST, AUTO_ESCALATION, ERR_COOLDOWN, PLANNING_RX, ARCH_RX
     global CURRENT_PLANNING_KEYWORDS, CURRENT_ARCH_KEYWORDS, KEY
     global OPT_ENABLED, OPT_URL, OPT_MODEL, OPT_KEY, OPT_TIMEOUT, OPT_TEMPERATURE, OPT_MAX_TOKENS
     global OPT_SYSTEM_PROMPT, OPT_MIN_CHARS, OPT_MIN_WORDS, OPT_PRESERVE_VARS, OPT_SKIP_SHORT, OPT_LOOP_MARKERS
     try:
+        if "pre_optimization" in data:
+            JevConfig.from_dict(data["pre_optimization"],
+                                (data.get("optimizer") or {}).get("model") or OPT_MODEL)
         models = data.get("models") or {}
         if not isinstance(models, dict):
             return False, "models must be an object"
@@ -1136,6 +1160,8 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
                 raw_m = [x.strip() for x in raw_m.replace(",", "\n").split("\n")]
             OPT_LOOP_MARKERS = [x for x in raw_m if x]
 
+        if "pre_optimization" in data:
+            PRE_OPT_CONFIG = data["pre_optimization"]
         with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(get_current_settings(), f, indent=2, ensure_ascii=False)
 
@@ -1146,6 +1172,7 @@ def save_settings_data(data: dict) -> tuple[bool, str]:
 
 
 def init_settings() -> None:
+    global PRE_OPT_CONFIG
     global MAP, RANK, DEFAULT_MODEL, UPSTREAM_ORIGIN, UPSTREAM_KEY, JEV_URL, JEV_MODEL, REWRITE
     global PLANNING_BOOST, AUTO_ESCALATION, ERR_COOLDOWN, PLANNING_RX, ARCH_RX
     global CURRENT_PLANNING_KEYWORDS, CURRENT_ARCH_KEYWORDS, KEY
@@ -1155,6 +1182,8 @@ def init_settings() -> None:
         try:
             with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            # Keep invalid gate config so evaluation fails closed without blocking startup.
+            PRE_OPT_CONFIG = data.get("pre_optimization", {})
             models = data.get("models") or {}
             if models.get("luna"):
                 MAP["luna"] = models["luna"]
@@ -1320,7 +1349,7 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
         effort = LEASE_EFFORT.get(sid, "medium")
         meta["effort"] = effort
     elif is_new and prompt:
-        # Step A: Prompt Optimization (BEFORE sending to Jev)
+        # Step A: Pre-optimization gate, then the selected prompt optimizer.
         raw_prompt = prompt
         opt_text = raw_prompt
         opt_status = "BYPASS_DISABLED"
@@ -1329,21 +1358,15 @@ def maybe_rewrite(raw: bytes, path: str, hdrs=None) -> tuple[bytes, dict]:
         orig_tok = max(1, int(len(raw_prompt) / 3.8))
         opt_tok = orig_tok
 
-        if OPT_ENABLED:
-            is_eligible, bypass_reason = check_prompt_heuristic(raw_prompt)
-            if is_eligible:
-                opt_result, success, status, latency_ms = run_prompt_optimizer(raw_prompt)
-                opt_status = status
-                opt_latency = latency_ms
-                if success:
-                    opt_text = opt_result
-                    opt_tok = max(1, int(len(opt_text) / 3.8))
-                    diff_data = generate_diff_summary(raw_prompt, opt_text)
-                    diff_summary = diff_data.get("unified_diff", "")
-                    update_last_user_prompt(body, opt_text)
-                    prompt = opt_text  # CRITICAL: send optimized prompt to Planning detection & Jev!
-            else:
-                opt_status = f"BYPASS_{bypass_reason}"
+        opt_result, success, opt_status, opt_latency, decision = preprocess_prompt(raw_prompt, body.get("metadata"))
+        meta["jev_pre_optimization"] = decision.to_dict()
+        if success:
+            opt_text = opt_result
+            opt_tok = max(1, int(len(opt_text) / 3.8))
+            diff_data = generate_diff_summary(raw_prompt, opt_text)
+            diff_summary = diff_data.get("unified_diff", "")
+            update_last_user_prompt(body, opt_text)
+            prompt = opt_text  # Send optimized prompt to planning detection and classification.
 
         meta["opt_status"] = opt_status
         meta["raw_prompt"] = raw_prompt
@@ -2624,20 +2647,21 @@ class Handler(BaseHTTPRequestHandler):
             if not prompt:
                 resp = {"success": False, "error": "Prompt không được để trống"}
             else:
-                is_eligible, reason = check_prompt_heuristic(prompt)
-                if not is_eligible and not force:
+                is_eligible, _ = check_prompt_heuristic(prompt)
+                opt_res, success, status, lat_ms, decision = preprocess_prompt(prompt, payload.get("metadata"), force)
+                if status.startswith("BYPASS_"):
                     resp = {
                         "success": True,
                         "raw_prompt": prompt,
                         "optimized_prompt": prompt,
-                        "opt_status": f"BYPASS_{reason}",
+                        "opt_status": status,
                         "opt_latency_ms": 0.0,
                         "diff_summary": "",
                         "is_eligible": False,
-                        "bypass_reason": reason,
+                        "bypass_reason": decision.reasoning,
+                        "jev_pre_optimization": decision.to_dict(),
                     }
                 else:
-                    opt_res, success, status, lat_ms = run_prompt_optimizer(prompt)
                     diff_data = generate_diff_summary(prompt, opt_res if success else prompt)
                     resp = {
                         "success": success,
@@ -2648,6 +2672,7 @@ class Handler(BaseHTTPRequestHandler):
                         "diff_summary": diff_data.get("unified_diff", ""),
                         "diff_stats": diff_data,
                         "is_eligible": is_eligible,
+                        "jev_pre_optimization": decision.to_dict(),
                     }
         except Exception as e:
             resp = {"success": False, "error": str(e)}
@@ -2677,19 +2702,12 @@ class Handler(BaseHTTPRequestHandler):
                 opt_latency = 0.0
                 diff_summary = ""
                 diff_stats = {}
-                is_eligible, reason = check_prompt_heuristic(raw_prompt)
-
-                if OPT_ENABLED and (is_eligible or force):
-                    opt_res, success, status, lat_ms = run_prompt_optimizer(raw_prompt)
-                    opt_status = status
-                    opt_latency = lat_ms
-                    if success:
-                        opt_prompt = opt_res
-                        diff_data = generate_diff_summary(raw_prompt, opt_prompt)
-                        diff_summary = diff_data.get("unified_diff", "")
-                        diff_stats = diff_data
-                elif not is_eligible:
-                    opt_status = f"BYPASS_{reason}"
+                opt_res, success, opt_status, opt_latency, decision = preprocess_prompt(raw_prompt, payload.get("metadata"), force)
+                if success:
+                    opt_prompt = opt_res
+                    diff_data = generate_diff_summary(raw_prompt, opt_prompt)
+                    diff_summary = diff_data.get("unified_diff", "")
+                    diff_stats = diff_data
 
                 prompt_to_classify = opt_prompt
                 is_planning = bool(PLANNING_RX.search(prompt_to_classify))
@@ -2725,6 +2743,7 @@ class Handler(BaseHTTPRequestHandler):
                     "diff_summary": diff_summary,
                     "diff_stats": diff_stats,
                     "jev_latency_ms": jev_latency,
+                    "jev_pre_optimization": decision.to_dict(),
                     "total_latency_ms": total_latency,
                     "is_planning": is_planning,
                     "is_heavy_arch": is_heavy_arch,

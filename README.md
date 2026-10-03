@@ -2,7 +2,7 @@
 
 # jev-cc-codex-router
 
-A single-file Python proxy that routes each Codex turn to the cheapest model tier that can handle it.
+A Python proxy that routes each Codex turn to the cheapest model tier that can handle it.
 
 It sits between Codex and any OpenAI **Responses API**-compatible upstream (a local gateway such as cc-switch, or a remote endpoint). On every new user turn it asks [Jev](https://docs.typesafe.ai) (TypeSafe System One) which tier the task needs, rewrites the request's `model` field, and keeps that choice for the rest of the turn.
 
@@ -32,6 +32,7 @@ It sits between Codex and any OpenAI **Responses API**-compatible upstream (a lo
 2. `cp .env.example .env` and set `TYPESAFE_API_KEY` (your own TypeSafe key).
 3. Set the upstream in `.env` if it is not `http://127.0.0.1:15721`: `JEV_UPSTREAM=http://your-gateway:port`
 4. Run: `python3 jev_router.py`
+
 5. Point Codex at the proxy in `~/.codex/config.toml`:
 
 ```toml
@@ -44,6 +45,12 @@ wire_api = "responses"
 ```
 
 Adjust the provider fields (auth, `requires_openai_auth`, etc.) to match how you reach your upstream. Requests keep whatever headers Codex sends, so authentication is forwarded to the upstream untouched.
+
+Optional pre-optimization gating and optimizer model routing are available through
+`settings.json.pre_optimization`. See the [Jev gate guide](docs/jev.md) and
+[annotated JSON configuration](jev.example.json). The gate defaults to disabled;
+existing optimizer behavior is preserved until configured. Run
+`python examples/jev_scenarios.py` for skip and specialist-routing examples.
 
 To roll back, point `model_provider` back to your original provider. The proxy holds no persistent state.
 

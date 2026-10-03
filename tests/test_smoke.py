@@ -35,7 +35,7 @@ class RouterSmokeTest(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls.temp.cleanup)
-        for name in ('jev_router.py', 'dashboard.html'):
+        for name in ('jev_router.py', 'jev.py', 'dashboard.html'):
             shutil.copy2(ROOT / name, cls.temp.name)
         (Path(cls.temp.name) / 'settings.json').write_text(
             json.dumps({'optimizer': {'enabled': False}}))

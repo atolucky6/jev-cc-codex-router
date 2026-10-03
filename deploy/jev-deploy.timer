@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Jev Router for CI-approved updates every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+RandomizedDelaySec=15s
+Unit=jev-deploy.service
+
+[Install]
+WantedBy=timers.target

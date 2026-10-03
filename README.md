@@ -56,6 +56,12 @@ Open `http://127.0.0.1:8787/dashboard` while the router is running.
 
 The dashboard adapts to mobile screens and reports connection failures while retaining the last successful activity update.
 
+## CI/CD
+
+Pull requests and pushes to `main` run syntax checks and isolated smoke tests in
+GitHub Actions. The production host can automatically deploy CI-approved `main`
+commits with health checks and code rollback. See [deployment setup and operations](deploy/README.md).
+
 ## Configuration
 
 All settings are environment variables (or lines in `.env`). See `.env.example` for the full list: listen address, upstream, Jev API URL, model name for each tier, fallback model, retry count and delay, log path, and `JEV_REWRITE=0` to turn routing off and only proxy and retry.
